@@ -1,0 +1,55 @@
+spring:
+  application:
+    name: backend
+  datasource:
+    url: jdbc:mysql://localhost:3306/ai_hub?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:Root@123456}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  ai:
+    openai:
+      api-key: ${AI_API_KEY:your_ai_api_key_here}   # DeepSeek API Key（从环境变量读取）
+      base-url: https://api.deepseek.com  # DeepSeek 官方 API（Spring AI 会自动加 /v1/chat/completions）
+      chat:
+        options:
+          model: deepseek-v4-pro  # DeepSeek 官方模型名称
+          temperature: 0.7
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+jwt:
+  secret: ${JWT_SECRET:aihub_community_jwt_secret_key_must_be_at_least_64_characters_long_for_hs512_algorithm}
+  expiration: 604800000   # 7天 单位毫秒
+
+server:
+  port: 8080
+
+logging:                        # 日志配置
+  level:
+    com.aihub: DEBUG
+    org.springframework.ai: DEBUG
+    org.springframework.web.client: DEBUG
+
+# 阿里云OSS配置
+# ⚠️ 安全提示：生产环境请使用环境变量或配置中心管理敏感信息
+aliyun:
+  oss:
+    endpoint: ${ALIYUN_OSS_ENDPOINT:}    # OSS访问域名（留空则使用本地存储）
+    access-key-id: ${ALIYUN_OSS_ACCESS_KEY_ID:}       # AccessKey ID（从环境变量读取）
+    access-key-secret: ${ALIYUN_OSS_ACCESS_KEY_SECRET:} # AccessKey Secret（从环境变量读取）
+    bucket-name: ${ALIYUN_OSS_BUCKET_NAME:}           # Bucket名称（从环境变量读取）
+    domain: ${ALIYUN_OSS_DOMAIN:}  # OSS自定义域名（可选）
+
+
