@@ -21,6 +21,7 @@ public class User {
     private String avatar;              // 头像
     private String role;      // USER, CREATOR, ADMIN
     private Integer status;   // 1正常 0封禁
+    private Integer tokenVersion;  // Token 版本号，用于强制失效旧 Token（修改密码时 +1）
 
     @TableField(fill = FieldFill.INSERT)    // 插入时填充
     private LocalDateTime createTime;

@@ -66,8 +66,8 @@ public class UserServiceImpl implements UserService {
 
         log.info("用户注册成功，用户ID: {}", user.getId());
 
-        // 4. 生成 JWT Token（注册后自动登录）
-        String token = jwtTokenProvider.generateToken(user.getId(), user.getUsername());
+        // 4. 生成 JWT Token（注册后自动登录，新用户 tokenVersion 默认为 0）
+        String token = jwtTokenProvider.generateToken(user.getId(), user.getUsername(), 0);
 
         // 5. 构建响应
         RegisterResponse response = new RegisterResponse();
@@ -84,10 +84,10 @@ public class UserServiceImpl implements UserService {
      * 用户登录
      *
      * @param request 登录请求
-     * @return JWT Token
+     * @return 包含 Access Token 和 Refresh Token 的 Map
      */
     @Override
-    public String login(LoginRequest request) {
+    public java.util.Map<String, String> login(LoginRequest request) {
         log.info("用户登录，用户名: {}", request.getUsername());
 
         // 1. 根据用户名查询用户
@@ -110,12 +110,23 @@ public class UserServiceImpl implements UserService {
             throw new RuntimeException(ErrorCode.USERNAME_OR_PASSWORD_ERROR.getMessage());
         }
 
-        // 5. 生成 JWT Token
-        String token = jwtTokenProvider.generateToken(user.getId(), user.getUsername());
+        // 5. 生成 Access Token 和 Refresh Token（嵌入当前 tokenVersion）
+        int tokenVersion = user.getTokenVersion() != null ? user.getTokenVersion() : 0;
+        String accessToken = jwtTokenProvider.generateToken(user.getId(), user.getUsername(), tokenVersion);
+        String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId(), user.getUsername(), tokenVersion);
 
-        log.info("用户登录成功，用户ID: {}", user.getId());
+        // 6. 将 Refresh Token 存入 Redis
+        String refreshTokenKey = "jwt:refresh:" + user.getId();
+        long refreshExpiration = jwtTokenProvider.getRefreshTokenExpiration();
+        redisTemplate.opsForValue().set(refreshTokenKey, refreshToken, refreshExpiration, TimeUnit.MILLISECONDS);
 
-        return token;
+        log.info("用户登录成功，用户ID: {}, RefreshToken 已存入 Redis", user.getId());
+
+        // 7. 返回包含两个 Token 的 Map
+        java.util.Map<String, String> tokens = new java.util.HashMap<>();
+        tokens.put("accessToken", accessToken);
+        tokens.put("refreshToken", refreshToken);
+        return tokens;
     }
 
     /**
@@ -129,16 +140,20 @@ public class UserServiceImpl implements UserService {
 
         // 1. 从 Token 中获取用户ID和过期时间
         Long userId = jwtTokenProvider.getUserIdFromToken(token);
-        long expirationTime = jwtTokenProvider.getExpirationFromToken(token).getTime();
-        long currentTime = System.currentTimeMillis();
-        long remainingTime = expirationTime - currentTime;
-        
+        long expirationTime = jwtTokenProvider.getExpirationFromToken(token).getTime();   // 获取Token的过期时间
+        long currentTime = System.currentTimeMillis();                                    // 获取当前时间
+        long remainingTime = expirationTime - currentTime;                                // 计算Token的剩余有效期
+
         // 2. 将 Token 加入 Redis 黑名单，设置过期时间为 Token 的剩余有效期
-        String blacklistKey = "jwt:blacklist:" + token;
+        String blacklistKey = "jwt:blacklist:" + token;   // 黑名单键
         long ttl = Math.max(remainingTime, 60000); // 至少保留1分钟
-        redisTemplate.opsForValue().set(blacklistKey, userId.toString(), ttl, TimeUnit.MILLISECONDS);
-        
-        log.info("Token 已加入黑名单，用户ID: {}, 剩余有效期: {}ms", userId, ttl);
+        redisTemplate.opsForValue().set(blacklistKey, userId.toString(), ttl, TimeUnit.MILLISECONDS);  // 加入Redis
+
+        // 3. 从 Redis 中删除 Refresh Token
+        String refreshTokenKey = "jwt:refresh:" + userId;
+        redisTemplate.delete(refreshTokenKey);
+
+        log.info("用户已退出登录，用户ID: {}, AccessToken 已加入黑名单，RefreshToken 已从 Redis 删除", userId);
     }
 
     /**
@@ -279,9 +294,12 @@ public class UserServiceImpl implements UserService {
 
         // 5. 加密并更新新密码（updateTime 会自动填充）
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        // 递增 Token 版本号，使所有旧的 Token 失效
+        int newTokenVersion = (user.getTokenVersion() != null ? user.getTokenVersion() : 0) + 1;
+        user.setTokenVersion(newTokenVersion);
         userMapper.updateById(user);
 
-        log.info("密码修改成功，用户ID: {}", userId);
+        log.info("密码修改成功，用户ID: {}, Token 版本号已更新为: {}", userId, newTokenVersion);
     }
 
     /**

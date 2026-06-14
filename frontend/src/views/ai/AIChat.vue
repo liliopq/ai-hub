@@ -117,7 +117,7 @@
 <script setup>
 import { ref, onMounted, nextTick } from 'vue'
 import { Bot, Plus, MessageSquare, Send } from 'lucide-vue-next'
-import { chatWithAI, getSessions, deleteSession } from '../../api/ai'
+import { chatWithAI, getSessions, deleteSession, getSessionMessages } from '../../api/ai'
 
 const sessions = ref([])
 const currentSessionId = ref('')
@@ -140,22 +140,51 @@ const formatTime = (time) => {
 const loadSessions = async () => {
   try {
     sessions.value = await getSessions()
-    if (sessions.value.length > 0) {
+    // 优先从 localStorage 恢复当前会话
+    const savedSessionId = localStorage.getItem('ai_current_session_id')
+    if (savedSessionId && sessions.value.some(s => s.sessionId === savedSessionId)) {
+      currentSessionId.value = savedSessionId
+    } else if (sessions.value.length > 0) {
       currentSessionId.value = sessions.value[0].sessionId
+    }
+    // 加载当前会话的历史消息
+    if (currentSessionId.value) {
+      await loadSessionMessages()
     }
   } catch (e) {
     console.error('获取会话列表失败:', e)
   }
 }
 
+const loadSessionMessages = async () => {
+  if (!currentSessionId.value) {
+    messages.value = []
+    return
+  }
+  // 保存当前会话ID到 localStorage
+  localStorage.setItem('ai_current_session_id', currentSessionId.value)
+  // 从后端获取历史消息
+  try {
+    const historyMessages = await getSessionMessages(currentSessionId.value)
+    messages.value = historyMessages.map(msg => ({
+      role: msg.role === 'USER' ? 'user' : 'assistant',
+      content: msg.content
+    }))
+  } catch (e) {
+    console.error('获取历史消息失败:', e)
+    messages.value = []
+  }
+}
+
 const switchSession = async (sessionId) => {
   currentSessionId.value = sessionId
-  messages.value = []
+  await loadSessionMessages()
 }
 
 const newChat = () => {
   currentSessionId.value = ''
   messages.value = []
+  localStorage.removeItem('ai_current_session_id')
 }
 
 const sendMessage = async () => {
@@ -177,6 +206,8 @@ const sendMessage = async () => {
     })
     
     currentSessionId.value = data.sessionId
+    // 发送消息后保存会话ID到 localStorage
+    localStorage.setItem('ai_current_session_id', currentSessionId.value)
     messages.value.push({ role: 'assistant', content: data.reply })
     
     await loadSessions()

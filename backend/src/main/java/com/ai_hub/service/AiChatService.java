@@ -2,7 +2,9 @@ package com.ai_hub.service;
 
 import com.ai_hub.dto.request.ChatRequest;
 import com.ai_hub.dto.response.ChatResponse;
+import com.ai_hub.dto.response.MessageItem;
 import com.ai_hub.dto.response.SessionListItem;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 
@@ -11,6 +13,15 @@ import java.util.List;
  */
 public interface AiChatService {
     
+    /**
+     * 与 AI 对话（流式输出）
+     *
+     * @param userId 用户ID
+     * @param request 对话请求
+     * @param emitter SSE Emitter
+     */
+    void chatStream(Long userId, ChatRequest request, SseEmitter emitter);
+
     /**
      * 与 AI 对话
      *
@@ -35,4 +46,13 @@ public interface AiChatService {
      * @param sessionId 会话ID
      */
     void deleteSession(Long userId, String sessionId);
+
+    /**
+     * 获取会话的历史消息
+     *
+     * @param userId 用户ID
+     * @param sessionId 会话ID
+     * @return 消息列表
+     */
+    List<MessageItem> getSessionMessages(Long userId, String sessionId);
 }

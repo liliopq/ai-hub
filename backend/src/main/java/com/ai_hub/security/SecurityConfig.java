@@ -1,8 +1,13 @@
 package com.ai_hub.security;
 
+import com.ai_hub.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.access.expression.method.DefaultMethodSecurityExpressionHandler;
+import org.springframework.security.access.expression.method.MethodSecurityExpressionHandler;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -16,17 +21,33 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * Spring Security 配置类
  */
-@Configuration                     // 声明为配置类
-@EnableWebSecurity                 // 启用 Spring Security
-@EnableMethodSecurity              // 启用方法级安全
-@RequiredArgsConstructor           // 引入依赖
+@Slf4j                                // 日志
+@Configuration                        // 声明为配置类
+@EnableWebSecurity                    // 启用 Spring Security
+@EnableMethodSecurity                // 启用方法级安全
+@RequiredArgsConstructor              // 引入依赖
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final UserMapper userMapper;
+
+    @Value("${cors.allowed-origins:http://localhost:5173}")
+    private String allowedOrigins;
+
+    /**
+     * 配置方法级安全表达式的自定义权限处理器
+     */
+    @Bean
+    public MethodSecurityExpressionHandler methodSecurityExpressionHandler() {
+        DefaultMethodSecurityExpressionHandler expressionHandler = new DefaultMethodSecurityExpressionHandler();
+        expressionHandler.setPermissionEvaluator(new CustomPermissionEvaluator(userMapper));
+        return expressionHandler;
+    }
 
     /**
      * 配置安全过滤链
@@ -56,6 +77,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/post/{postId}").permitAll()
                         .requestMatchers("/api/comment/list/{postId}").permitAll()
                         .requestMatchers("/api/user/{userId}").permitAll()
+                        // AI 对话接口
+                        .requestMatchers("/api/ai/**").permitAll()
+                        // WebSocket 端点允许跨域
+                        .requestMatchers("/ws/**").permitAll()
+                        .requestMatchers("/api/ws/**").permitAll()
                         // 其他请求需要认证
                         .anyRequest().authenticated()
                 )
@@ -73,14 +99,20 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // 生产环境应该配置具体的域名，例如：Arrays.asList("http://localhost:5173", "https://yourdomain.com")
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173"));
+        
+        // 从配置文件读取允许的域名，支持多域名配置（用逗号分隔）
+        List<String> origins = Arrays.asList(allowedOrigins.split(","));
+        configuration.setAllowedOrigins(origins);
+        
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
-        configuration.setAllowCredentials(false);
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
+        
+        log.info("CORS 配置已加载，允许的域名: {}", origins);
         return source;
     }
 

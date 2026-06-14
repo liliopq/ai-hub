@@ -1,6 +1,7 @@
 package com.ai_hub.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 /**
@@ -13,6 +14,7 @@ public class ChatRequest {
      * 用户消息
      */
     @NotBlank(message = "消息内容不能为空")
+    @Size(max = 2000, message = "消息内容不能超过2000个字符")
     private String message;
     
     /**

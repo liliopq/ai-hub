@@ -1,0 +1,157 @@
+# ============================================
+# AI Hub 社区平台 - Docker Compose 编排
+# ============================================
+# 使用方式：
+#   1. cp .env.example .env  （复制环境变量模板）
+#   2. 编辑 .env 填写你的配置
+#   3. docker compose up -d --build
+#   4. 访问 http://localhost 即可使用
+#
+# 服务说明：
+#   - mysql:   MySQL 8.0 数据库
+#   - redis:   Redis 7 缓存
+#   - backend: Spring Boot 后端（端口 8080）
+#   - frontend: Vue 3 + Nginx 前端（端口 80）
+#
+# 生产环境部署注意事项：
+#   - 修改所有默认密码和 JWT 密钥
+#   - 取消 Redis 密码认证（默认已关闭）
+#   - 可注释掉 mysql/redis 的 host ports 映射（仅容器间通信即可）
+# ============================================
+
+services:
+
+  # ==================== MySQL 8.0 ====================
+  mysql:
+    image: mysql:8.0
+    container_name: ai-hub-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-Root@123456}
+      MYSQL_DATABASE: ${DB_NAME:-ai_hub}
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+      TZ: Asia/Shanghai
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      # 首次启动时自动执行初始化脚本（创建表结构 + 插入管理员账号）
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    command:
+      - --default-authentication-plugin=caching_sha2_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --lower-case-table-names=1
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD:-Root@123456}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - ai-hub-network
+
+  # ==================== Redis 7 ====================
+  redis:
+    image: redis:7-alpine
+    container_name: ai-hub-redis
+    restart: unless-stopped
+    # 生产环境建议注释掉 host 端口映射，仅容器间通信
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    # Redis 密码（可通过 REDIS_PASSWORD 环境变量设置，留空则无密码）
+    command: >
+      sh -c "
+        if [ -n \"$${REDIS_PASSWORD}\" ]; then
+          redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru --requirepass $${REDIS_PASSWORD};
+        else
+          redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru;
+        fi
+      "
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    healthcheck:
+      test: >
+        sh -c "
+          if [ -n \"$${REDIS_PASSWORD}\" ]; then
+            redis-cli -a $${REDIS_PASSWORD} ping | grep -q PONG;
+          else
+            redis-cli ping | grep -q PONG;
+          fi
+        "
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - ai-hub-network
+
+  # ==================== Spring Boot 后端 ====================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ai-hub-backend
+    restart: unless-stopped
+    environment:
+      # 数据库连接（指向容器内的 MySQL）
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-ai_hub}
+      DB_USERNAME: root
+      DB_PASSWORD: ${DB_PASSWORD:-Root@123456}
+      # Redis 连接（指向容器内的 Redis）
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      # JWT 密钥（生产环境请修改为强密码）
+      JWT_SECRET: ${JWT_SECRET:-aihub_community_jwt_secret_key_must_be_at_least_64_characters_long_for_hs512_algorithm}
+      # DeepSeek AI API Key
+      AI_API_KEY: ${AI_API_KEY:-your_ai_api_key_here}
+      # 阿里云 OSS
+      ALIYUN_OSS_ENDPOINT: ${ALIYUN_OSS_ENDPOINT:-}
+      ALIYUN_OSS_ACCESS_KEY_ID: ${ALIYUN_OSS_ACCESS_KEY_ID:-}
+      ALIYUN_OSS_ACCESS_KEY_SECRET: ${ALIYUN_OSS_ACCESS_KEY_SECRET:-}
+      ALIYUN_OSS_BUCKET_NAME: ${ALIYUN_OSS_BUCKET_NAME:-}
+      ALIYUN_OSS_DOMAIN: ${ALIYUN_OSS_DOMAIN:-}
+      # CORS 允许的域名（Nginx 反代后的地址）
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ai-hub-network
+
+  # ==================== Vue 3 + Nginx 前端 ====================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: /api
+    container_name: ai-hub-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - ai-hub-network
+
+# ==================== 数据卷 ====================
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+
+# ==================== 网络 ====================
+networks:
+  ai-hub-network:
+    driver: bridge

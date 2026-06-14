@@ -143,16 +143,24 @@ const goToProfile = () => {
   showDropdown.value = false
   router.push('/profile')
 }
+const handleNotificationUpdated = () => {
+  fetchUnreadCount()
+}
+
 onMounted(() => {
   fetchUnreadCount()
   document.addEventListener('click', handleClickOutside)
   // 添加user-updated事件监听器
   window.addEventListener('user-updated', handleUserUpdated)
+  // 添加notification-updated事件监听器
+  window.addEventListener('notification-updated', handleNotificationUpdated)
 })
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
   // 移除user-updated事件监听器
   window.removeEventListener('user-updated', handleUserUpdated)
+  // 移除notification-updated事件监听器
+  window.removeEventListener('notification-updated', handleNotificationUpdated)
 })
 defineExpose({
   fetchUnreadCount

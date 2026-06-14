@@ -10,13 +10,14 @@ USE ai_hub;
 -- 注意：这个密码是 BCrypt 加密后的结果
 -- 如果需要修改密码，请使用 BCrypt 在线工具生成新的哈希值
 
-INSERT INTO user (username, password, email, role, status, create_time, update_time, deleted) 
+INSERT INTO user (username, password, email, role, status, token_version, create_time, update_time, deleted)
 VALUES (
     'admin',
     '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi',
     'admin@aihub.com',
     'ADMIN',
     1,
+    0,
     NOW(),
     NOW(),
     0

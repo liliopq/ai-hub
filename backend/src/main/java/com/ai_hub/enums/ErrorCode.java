@@ -33,6 +33,7 @@ public enum ErrorCode {
     USERNAME_OR_PASSWORD_ERROR(1003, "用户名或密码错误"),
     TOKEN_INVALID(1004, "Token 无效或已过期"),
     TOKEN_EXPIRED(1005, "Token 已过期"),
+    TOKEN_VERSION_MISMATCH(1009, "Token 版本不匹配，请重新登录"),
     EMAIL_ALREADY_EXISTS(1006, "邮箱已被注册"),
     OLD_PASSWORD_ERROR(1007, "原密码错误"),
     ACCOUNT_DISABLED(1008, "账号已被禁用"),

@@ -24,9 +24,9 @@ public interface UserService {
      * 用户登录
      *
      * @param request 登录请求
-     * @return JWT Token
+     * @return 包含 Access Token 和 Refresh Token 的 Map
      */
-    String login(LoginRequest request);
+    java.util.Map<String, String> login(LoginRequest request);
 
     /**
      * 用户退出登录（将 Token 加入黑名单）

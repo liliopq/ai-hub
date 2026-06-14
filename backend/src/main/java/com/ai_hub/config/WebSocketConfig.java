@@ -54,7 +54,12 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 .setAllowedOriginPatterns("*")
                 .withSockJS();
         
-        log.info("WebSocket 端点已注册: /ws/notification");
+        // 注册带 /api 前缀的端点，兼容前端配置
+        registry.addEndpoint("/api/ws/notification")
+                .setAllowedOriginPatterns("*")
+                .withSockJS();
+        
+        log.info("WebSocket 端点已注册: /ws/notification, /api/ws/notification");
     }
 
     /**

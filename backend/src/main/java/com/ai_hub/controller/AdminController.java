@@ -5,13 +5,12 @@ import com.ai_hub.dto.response.AdminPostResponse;
 import com.ai_hub.dto.response.AdminUserResponse;
 import com.ai_hub.dto.response.PageResult;
 import com.ai_hub.dto.response.Result;
-import com.ai_hub.entity.User;
-import com.ai_hub.mapper.UserMapper;
 import com.ai_hub.service.AdminService;
 import com.ai_hub.utils.TokenValidator;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -25,34 +24,6 @@ public class AdminController {
 
     private final AdminService adminService;
     private final TokenValidator tokenValidator;
-    private final UserMapper userMapper;
-
-    /**
-     * 权限校验：验证用户是否为 ADMIN 角色
-     *
-     * @param authorization Authorization头
-     * @throws RuntimeException 如果不是 ADMIN 角色
-     */
-    private void checkAdminPermission(String authorization) {
-        // 验证Token并提取用户ID
-        TokenValidator.ValidationResult result = tokenValidator.validateAndExtractUserId(authorization);
-        if (!result.isSuccess()) {
-            throw new RuntimeException(result.getErrorResult().getMessage());
-        }
-
-        Long userId = result.getUserId();
-        
-        // 查询用户角色
-        User user = userMapper.selectById(userId);
-        if (user == null) {
-            throw new RuntimeException("用户不存在");
-        }
-        
-        // 检查是否为 ADMIN 角色
-        if (!"ADMIN".equals(user.getRole())) {
-            throw new RuntimeException("没有权限访问，需要 ADMIN 角色");
-        }
-    }
 
     /**
      * 分页查询用户列表
@@ -66,6 +37,7 @@ public class AdminController {
      * @return 分页结果
      */
     @GetMapping("/users")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<PageResult<AdminUserResponse>> getUserList(
             @RequestHeader("Authorization") String authorization,
             @RequestParam(required = false, defaultValue = "1") Integer page,
@@ -74,9 +46,6 @@ public class AdminController {
             @RequestParam(required = false) String role,
             @RequestParam(required = false) Integer status) {
         log.info("管理员查询用户列表请求");
-
-        // 权限校验
-        checkAdminPermission(authorization);
 
         // 构建查询请求
         AdminUserListRequest request = new AdminUserListRequest();
@@ -101,14 +70,12 @@ public class AdminController {
      * @return 操作结果
      */
     @PutMapping("/users/{userId}/status")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<Void> updateUserStatus(
             @RequestHeader("Authorization") String authorization,
             @PathVariable Long userId,
             @Valid @RequestBody UpdateUserStatusRequest request) {
         log.info("封禁/解封用户请求，目标用户ID: {}, 新状态: {}", userId, request.getStatus());
-
-        // 权限校验
-        checkAdminPermission(authorization);
 
         // 执行状态更新
         adminService.updateUserStatus(userId, request.getStatus());
@@ -128,6 +95,7 @@ public class AdminController {
      * @return 分页结果
      */
     @GetMapping("/posts")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<PageResult<AdminPostResponse>> getPostList(
             @RequestHeader("Authorization") String authorization,
             @RequestParam(required = false, defaultValue = "1") Integer page,
@@ -135,9 +103,6 @@ public class AdminController {
             @RequestParam(required = false) Integer status,
             @RequestParam(required = false) Long userId) {
         log.info("管理员查询帖子列表请求");
-
-        // 权限校验
-        checkAdminPermission(authorization);
 
         // 构建查询请求
         AdminPostListRequest request = new AdminPostListRequest();
@@ -161,14 +126,12 @@ public class AdminController {
      * @return 操作结果
      */
     @PutMapping("/posts/{postId}/audit")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<Void> auditPost(
             @RequestHeader("Authorization") String authorization,
             @PathVariable Long postId,
             @Valid @RequestBody AuditPostRequest request) {
         log.info("审核帖子请求，帖子ID: {}, 新状态: {}", postId, request.getStatus());
-
-        // 权限校验
-        checkAdminPermission(authorization);
 
         // 执行审核
         adminService.auditPost(postId, request.getStatus(), request.getReason());
@@ -185,14 +148,12 @@ public class AdminController {
      * @return 操作结果
      */
     @PutMapping("/posts/{postId}/sticky")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<Void> updatePostSticky(
             @RequestHeader("Authorization") String authorization,
             @PathVariable Long postId,
             @Valid @RequestBody UpdatePostStickyRequest request) {
         log.info("更新帖子置顶状态请求，帖子ID: {}, 新状态: {}", postId, request.getSticky());
-
-        // 权限校验
-        checkAdminPermission(authorization);
 
         // 执行更新
         adminService.updatePostSticky(postId, request.getSticky());
@@ -209,14 +170,12 @@ public class AdminController {
      * @return 操作结果
      */
     @PutMapping("/posts/{postId}/essence")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<Void> updatePostEssence(
             @RequestHeader("Authorization") String authorization,
             @PathVariable Long postId,
             @Valid @RequestBody UpdatePostEssenceRequest request) {
         log.info("更新帖子加精状态请求，帖子ID: {}, 新状态: {}", postId, request.getEssence());
-
-        // 权限校验
-        checkAdminPermission(authorization);
 
         // 执行更新
         adminService.updatePostEssence(postId, request.getEssence());
@@ -232,13 +191,11 @@ public class AdminController {
      * @return 操作结果
      */
     @DeleteMapping("/comments/{commentId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<Void> deleteComment(
             @RequestHeader("Authorization") String authorization,
             @PathVariable Long commentId) {
         log.info("管理员删除评论请求，评论ID: {}", commentId);
-
-        // 权限校验
-        checkAdminPermission(authorization);
 
         // 执行删除
         adminService.deleteComment(commentId);

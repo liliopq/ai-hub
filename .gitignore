@@ -20,6 +20,7 @@ desktop.ini
 .env.*.local
 backend/.env
 frontend/.env
+docker/.env
 
 ### 后端忽略 ###
 backend/target/
@@ -49,6 +50,9 @@ frontend/yarn-error.log*
 ### 日志文件 ###
 logs/
 *.log
+
+### Docker ###
+docker-compose.override.yml
 
 ### 其他 ###
 README.md.bak

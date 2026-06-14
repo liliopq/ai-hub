@@ -1,55 +1,312 @@
+# ============================================================
+# Spring Boot 应用配置文件
+# ============================================================
+#
+# 本配置文件采用YAML格式，用于配置Spring Boot应用程序的各种参数
+#
+# YAML语法说明：
+# - 使用缩进表示层级关系（不能使用Tab，必须使用空格）
+# - 键值对使用冒号分隔：key: value
+# - 数组使用短横线：- item
+# - 可以使用 ${变量名:默认值} 引用环境变量
+#
+# 配置文件加载顺序（后面的会覆盖前面的）：
+# 1. classpath:application.yml
+# 2. classpath:application-{profile}.yml
+# 3. file:./application.yml
+# 4. 环境变量
+# ============================================================
+
 spring:
+  # 应用名称，用于服务注册、链路追踪等场景
   application:
     name: backend
+
+  # ============================================================
+  # 数据库数据源配置
+  # ============================================================
   datasource:
+    # JDBC连接URL
+    # 参数说明：
+    # - useSSL=false：禁用SSL连接（开发环境使用，生产环境建议启用）
+    # - serverTimezone=Asia/Shanghai：设置时区为中国时区
+    # - characterEncoding=utf8：设置字符编码为UTF-8，支持中文
+    # - useUnicode=true：启用Unicode字符支持
+    # - allowPublicKeyRetrieval=true：允许公钥检索（MySQL 8.0+需要）
+    # - serverTimezone：指定MySQL服务器的时区
     url: jdbc:mysql://localhost:3306/ai_hub?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8
+
+    # 数据库用户名
+    # 使用 ${DB_USERNAME:root} 表示：
+    # - 优先读取环境变量 DB_USERNAME
+    # - 如果环境变量不存在，则使用默认值 root
     username: ${DB_USERNAME:root}
+
+    # 数据库密码
+    # 生产环境强烈建议使用环境变量，不要明文写在配置文件中
     password: ${DB_PASSWORD:Root@123456}
+
+    # JDBC驱动类名
+    # MySQL 8.0+ 使用 com.mysql.cj.jdbc.Driver
+    # 旧版本MySQL使用 com.mysql.jdbc.Driver
     driver-class-name: com.mysql.cj.jdbc.Driver
 
+    # ============================================================
+    # Spring AI 配置（对接DeepSeek大模型）
+    # ============================================================
   ai:
     openai:
-      api-key: ${AI_API_KEY:your_ai_api_key_here}   # DeepSeek API Key（从环境变量读取）
-      base-url: https://api.deepseek.com  # DeepSeek 官方 API（Spring AI 会自动加 /v1/chat/completions）
+      # API密钥，用于调用DeepSeek API
+      # 生产环境必须通过环境变量设置，不要明文写在配置文件中
+      # 获取地址：https://platform.deepseek.com/
+      api-key: ${AI_API_KEY:your_ai_api_key_here}
+
+      # API基础URL，Spring AI会自动拼接 /v1/chat/completions
+      # DeepSeek官方API地址
+      base-url: https://api.deepseek.com
+
+      # Chat模型配置
       chat:
         options:
-          model: deepseek-v4-pro  # DeepSeek 官方模型名称
+          # 模型名称
+          # deepseek-chat：DeepSeek官方对话模型
+          # deepseek-coder：DeepSeek代码生成模型
+          model: deepseek-chat
+
+          # 生成文本的随机性参数
+          # 取值范围：0.0 ~ 2.0
+          # - 0.0：几乎确定性的输出，适合factual Q&A
+          # - 0.7：平衡创造性和准确性，适合通用对话
+          # - 1.5：高度创造性的输出，适合诗歌、故事创作
+          # - 2.0：几乎随机的输出
           temperature: 0.7
+
+  # ============================================================
+  # Redis缓存配置
+  # ============================================================
   data:
     redis:
+      # Redis服务器地址
       host: localhost
+
+      # Redis服务器端口
       port: 6379
 
+      # 可选配置项（可根据需要添加）：
+      # password: ${REDIS_PASSWORD:}  # Redis密码（如果有）
+      # database: 0                   # 使用的数据库编号（0-15）
+      # timeout: 3000ms               # 连接超时时间
+      # lettuce:                      # Lettuce客户端配置
+      #   pool:
+      #     max-active: 8              # 最大连接数
+      #     max-idle: 8               # 最大空闲连接数
+      #     min-idle: 0               # 最小空闲连接数
+      #     max-wait: -1ms            # 最大等待时间，-1表示无限制
+
+# ============================================================
+# MyBatis-Plus ORM框架配置
+# ============================================================
 mybatis-plus:
+  # Mapper XML文件的位置
+  # classpath*:/mapper/**/*.xml 表示从classpath根目录开始查找
+  # 支持通配符：* 匹配任意字符，** 匹配任意目录
   mapper-locations: classpath*:/mapper/**/*.xml
+
+  # 全局配置
   global-config:
     db-config:
+      # 主键生成策略
+      # - auto：数据库自增
+      # - input：用户输入
+      # - assign_id：基于雪花算法生成ID
+      # - assign_uuid：基于UUID生成ID
       id-type: auto
+
+      # 逻辑删除字段配置
+      # 配置后，删除操作会变为更新操作（设置deleted=1）
+      # 查询时会自动添加 WHERE deleted = 0 条件
       logic-delete-field: deleted
+
+  # MyBatis配置
   configuration:
+    # 日志实现类
+    # org.apache.ibatis.logging.stdout.StdOutImpl：输出到控制台（开发环境）
+    # org.apache.ibatis.logging.slf4j.Slf4jImpl：输出到日志（生产环境）
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 
-jwt:
-  secret: ${JWT_SECRET:aihub_community_jwt_secret_key_must_be_at_least_64_characters_long_for_hs512_algorithm}
-  expiration: 604800000   # 7天 单位毫秒
+    # 可选配置项：
+    # map-underscore-to-camel-case: true  # 开启驼峰命名自动映射
+    # cache-enabled: false                # 禁用二级缓存
+    # aggressive-lazy-loading: false      # 关闭积极的懒加载
 
+# ============================================================
+# JWT（JSON Web Token）配置
+# ============================================================
+jwt:
+  # JWT签名密钥
+  # ⚠️ 重要提示：
+  # 1. 生产环境必须设置环境变量 JWT_SECRET，不要使用默认值
+  # 2. 密钥长度必须 ≥ 64 字符（HS512算法要求）
+  # 3. 建议使用随机字符串生成器生成强密钥
+  # 4. 不要在代码仓库中明文存储密钥
+  #
+  # 生成强密钥的方法（Linux/Mac）：
+  # openssl rand -base64 64
+  secret: ${JWT_SECRET:aihub_community_jwt_secret_key_must_be_at_least_64_characters_long_for_hs512_algorithm}
+
+  # Token过期时间
+  # 单位：毫秒
+  # 604800000ms = 7天
+  # 其他常用值：
+  # - 3600000ms = 1小时
+  # - 86400000ms = 1天
+  # - 2592000000ms = 30天
+  expiration: 604800000
+
+  # Refresh Token过期时间
+  # 单位：毫秒
+  # 2592000000ms = 30天
+  # Refresh Token的有效期应该比Access Token长很多
+  refresh-expiration: 2592000000
+
+# ============================================================
+# 服务器配置
+# ============================================================
 server:
+  # 服务器端口号
+  # 默认：8080
+  # 如果被占用，会自动尝试下一个端口
   port: 8080
 
-logging:                        # 日志配置
+  # 可选配置项：
+  # servlet:
+  #   context-path: /api        # 应用上下文路径
+  # tomcat:
+  #   threads:
+  #     max: 200                 # 最大工作线程数
+  #     min-spare: 10            # 最小工作线程数
+  #   max-connections: 10000    # 最大连接数
+  #   accept-count: 100          # 等待队列长度
+
+# ============================================================
+# CORS（跨域资源共享）配置
+# ============================================================
+# CORS允许浏览器向不同源（协议、域名、端口）的服务器发起请求
+# 主要用于解决前后端分离项目中的跨域问题
+cors:
+  # 允许的源（Origin）列表
+  # 多个域名用逗号分隔
+  # ⚠️ 注意：
+  # 1. 必须包含完整的协议（http:// 或 https://）
+  # 2. 不支持通配符，但可以使用正则表达式
+  # 3. 生产环境应只允许特定的域名
+  allowed-origins: http://localhost:5173,https://yourdomain.com
+
+  # 可选配置项：
+  # allowed-methods: GET,POST,PUT,DELETE,OPTIONS  # 允许的HTTP方法
+  # allowed-headers: *                            # 允许的请求头
+  # allow-credentials: true                      # 是否允许携带凭证（Cookie）
+  # max-age: 3600                                # 预检请求缓存时间（秒）
+
+# ============================================================
+# 日志配置
+# ============================================================
+# Spring Boot使用SLF4J作为日志门面，默认使用Logback作为实现
+logging:
+  # 日志级别配置
   level:
+    # 根日志级别
+    # root: INFO
+
+    # 指定包的日志级别
+    # com.aihub: DEBUG  表示com.aihub包及其子包使用DEBUG级别
+
+    # 项目业务日志（开发环境使用DEBUG方便调试）
     com.aihub: DEBUG
+
+    # Spring AI日志（查看AI模型调用详情）
     org.springframework.ai: DEBUG
+
+    # HTTP客户端日志（查看API调用详情）
     org.springframework.web.client: DEBUG
 
-# 阿里云OSS配置
-# ⚠️ 安全提示：生产环境请使用环境变量或配置中心管理敏感信息
+    # 可选：其他常用包
+    # org.springframework.web: INFO
+    # org.springframework.security: INFO
+    # org.springframework.jdbc: DEBUG
+    # com.baomidou.mybatisplus: DEBUG
+
+  # 可选配置项：
+  # pattern:
+  #   console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  #   file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  # file:
+  #   name: logs/application.log    # 日志文件路径
+  #   max-size: 10MB                # 单个日志文件最大大小
+  #   max-history: 30               # 保留的日志文件数量
+
+# ============================================================
+# 阿里云OSS（对象存储服务）配置
+# ============================================================
+# OSS用于存储用户上传的文件（头像、图片、视频等）
+# 配置留空则使用本地存储（开发环境）
 aliyun:
   oss:
-    endpoint: ${ALIYUN_OSS_ENDPOINT:}    # OSS访问域名（留空则使用本地存储）
-    access-key-id: ${ALIYUN_OSS_ACCESS_KEY_ID:}       # AccessKey ID（从环境变量读取）
-    access-key-secret: ${ALIYUN_OSS_ACCESS_KEY_SECRET:} # AccessKey Secret（从环境变量读取）
-    bucket-name: ${ALIYUN_OSS_BUCKET_NAME:}           # Bucket名称（从环境变量读取）
-    domain: ${ALIYUN_OSS_DOMAIN:}  # OSS自定义域名（可选）
+    # OSS服务地址（Endpoint）
+    # 格式：https://oss-{region}.aliyuncs.com
+    # 示例：https://oss-cn-hangzhou.aliyuncs.com
+    # 留空则使用本地存储
+    endpoint: ${ALIYUN_OSS_ENDPOINT:}
 
+    # 访问密钥ID
+    # ⚠️ 重要提示：
+    # 1. 生产环境必须通过环境变量设置
+    # 2. 不要明文写在配置文件中
+    # 3. 建议使用RAM子用户的AccessKey
+    access-key-id: ${ALIYUN_OSS_ACCESS_KEY_ID:}
 
+    # 访问密钥Secret
+    access-key-secret: ${ALIYUN_OSS_ACCESS_KEY_SECRET:}
+
+    # OSS存储空间名称（Bucket）
+    # 创建OSS实例后，在控制台可以查看
+    bucket-name: ${ALIYUN_OSS_BUCKET_NAME:}
+
+    # 自定义域名（可选）
+    # 如果配置了CDN或自定义域名，在这里设置
+    # 格式：https://cdn.yourdomain.com
+    # 留空则使用OSS默认域名
+    domain: ${ALIYUN_OSS_DOMAIN:}
+
+# ============================================================
+# 配置示例
+# ============================================================
+#
+# 开发环境（本地）：
+# - 数据库：本地MySQL
+# - Redis：本地Redis
+# - OSS：本地存储（endpoint留空）
+# - JWT_SECRET：使用默认值（仅限开发环境）
+#
+# 生产环境（必须设置以下环境变量）：
+# - DB_USERNAME：数据库用户名
+# - DB_PASSWORD：数据库密码
+# - JWT_SECRET：JWT签名密钥（至少64字符）
+# - AI_API_KEY：DeepSeek API密钥
+# - ALIYUN_OSS_ENDPOINT：OSS服务地址
+# - ALIYUN_OSS_ACCESS_KEY_ID：阿里云AccessKey ID
+# - ALIYUN_OSS_ACCESS_KEY_SECRET：阿里云AccessKey Secret
+# - ALIYUN_OSS_BUCKET_NAME：OSS Bucket名称
+#
+# Docker/Kubernetes部署示例：
+# docker run -e DB_USERNAME=prod_user \
+#            -e DB_PASSWORD=secure_password \
+#            -e JWT_SECRET=your_very_long_secret_key_at_least_64_characters_long \
+#            -e AI_API_KEY=sk-xxxxx \
+#            -e ALIYUN_OSS_ENDPOINT=https://oss-cn-hangzhou.aliyuncs.com \
+#            -e ALIYUN_OSS_ACCESS_KEY_ID=xxxxx \
+#            -e ALIYUN_OSS_ACCESS_KEY_SECRET=xxxxx \
+#            -e ALIYUN_OSS_BUCKET_NAME=my-bucket \
+#            your-image-name
+#
+# ============================================================

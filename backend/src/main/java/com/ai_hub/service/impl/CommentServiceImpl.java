@@ -17,6 +17,7 @@ import com.ai_hub.mapper.PostMapper;
 import com.ai_hub.mapper.UserMapper;
 import com.ai_hub.service.CommentService;
 import com.ai_hub.service.WebSocketNotificationService;
+import com.ai_hub.utils.XssUtils;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
@@ -82,12 +83,12 @@ public class CommentServiceImpl implements CommentService {
             throw new RuntimeException(ErrorCode.USER_NOT_FOUND.getMessage());
         }
         
-        // 4. 创建评论
+        // 4. 创建评论（进行 XSS 防护）
         Comment comment = new Comment();
         comment.setPostId(request.getPostId());
         comment.setUserId(userId);
         comment.setParentId(request.getParentId() != null ? request.getParentId() : 0L);
-        comment.setContent(request.getContent());
+        comment.setContent(XssUtils.escapeHtml(request.getContent()));
         comment.setLikeCount(0);
         comment.setStatus(1); // 默认状态为正常
         
@@ -101,7 +102,7 @@ public class CommentServiceImpl implements CommentService {
 
         // 6. 发送评论通知给帖子作者（排除自己评论自己帖子的情况）
         if (!userId.equals(post.getUserId())) {
-            webSocketNotificationService.sendCommentNotification(post.getUserId(), userId, request.getPostId(), comment.getId(), request.getContent());
+            webSocketNotificationService.sendCommentNotification(post.getUserId(), userId, request.getPostId(), comment.getId(), XssUtils.escapeHtml(request.getContent()));
         }
         
         // 7. 构建响应
@@ -324,12 +325,16 @@ public class CommentServiceImpl implements CommentService {
             throw new RuntimeException("评论不存在");
         }
         
+        // 获取评论作者ID
+        Long commentAuthorId = comment.getUserId();
+        
         // 2. 检查是否已经点过赞
         LambdaQueryWrapper<CommentLike> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(CommentLike::getCommentId, commentId)
                 .eq(CommentLike::getUserId, userId);
         CommentLike existingLike = commentLikeMapper.selectOne(queryWrapper);
         
+        boolean isLiked;
         if (existingLike != null) {
             // 取消点赞
             commentLikeMapper.deleteById(existingLike.getId());
@@ -342,6 +347,7 @@ public class CommentServiceImpl implements CommentService {
             }
             commentMapper.updateById(comment);
             
+            isLiked = false;
             log.info("取消点赞成功，评论ID: {}", commentId);
         } else {
             // 点赞
@@ -354,7 +360,18 @@ public class CommentServiceImpl implements CommentService {
             comment.setLikeCount(comment.getLikeCount() != null ? comment.getLikeCount() + 1 : 1);
             commentMapper.updateById(comment);
             
+            isLiked = true;
             log.info("点赞成功，评论ID: {}", commentId);
+            
+            // 发送评论点赞通知（排除自己点赞自己的情况）
+            if (!userId.equals(commentAuthorId)) {
+                // 获取评论内容用于通知
+                String commentContent = comment.getContent();
+                if (commentContent != null && commentContent.length() > 20) {
+                    commentContent = commentContent.substring(0, 20) + "...";
+                }
+                webSocketNotificationService.sendCommentLikeNotification(commentAuthorId, userId, commentId, commentContent);
+            }
         }
         
         // 3. 返回最新的点赞数

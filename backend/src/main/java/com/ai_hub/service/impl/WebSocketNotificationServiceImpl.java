@@ -5,6 +5,7 @@ import com.ai_hub.entity.Notification;
 import com.ai_hub.entity.User;
 import com.ai_hub.mapper.NotificationMapper;
 import com.ai_hub.mapper.UserMapper;
+import com.ai_hub.service.NotificationQueueService;
 import com.ai_hub.service.WebSocketNotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * WebSocket通知发布服务实现类
+ * 支持同步和异步两种模式
  */
 @Slf4j
 @Service
@@ -22,96 +24,37 @@ public class WebSocketNotificationServiceImpl implements WebSocketNotificationSe
     private final SimpMessagingTemplate messagingTemplate;
     private final NotificationMapper notificationMapper;
     private final UserMapper userMapper;
+    private final NotificationQueueService notificationQueueService;
 
     @Override
     public void sendLikeNotification(Long userId, Long sourceUserId, Long postId) {
-        log.info("发送点赞通知，用户ID: {}, 来源用户ID: {}, 帖子ID: {}", userId, sourceUserId, postId);
-
-        // 1. 获取来源用户信息
-        User sourceUser = userMapper.selectById(sourceUserId);
-        if (sourceUser == null) {
-            log.warn("来源用户不存在，用户ID: {}", sourceUserId);
-            return;
-        }
-
-        // 2. 保存通知到数据库
-        Notification notification = saveNotification(userId, sourceUserId, postId, null, "LIKE", 
-                sourceUser.getUsername() + " 点赞了你的帖子");
-
-        // 3. 构建通知消息
-        NotificationMessage message = buildNotificationMessage(notification, sourceUser);
-
-        // 4. 发送WebSocket通知
-        sendNotificationToUser(userId, message);
+        log.info("发送点赞通知（异步），用户ID: {}, 来源用户ID: {}, 帖子ID: {}", userId, sourceUserId, postId);
+        notificationQueueService.sendLikeNotificationAsync(userId, sourceUserId, postId);
     }
 
     @Override
     public void sendCommentNotification(Long userId, Long sourceUserId, Long postId, Long commentId, String content) {
-        log.info("发送评论通知，用户ID: {}, 来源用户ID: {}, 帖子ID: {}, 评论ID: {}", 
+        log.info("发送评论通知（异步），用户ID: {}, 来源用户ID: {}, 帖子ID: {}, 评论ID: {}", 
                 userId, sourceUserId, postId, commentId);
-
-        // 1. 获取来源用户信息
-        User sourceUser = userMapper.selectById(sourceUserId);
-        if (sourceUser == null) {
-            log.warn("来源用户不存在，用户ID: {}", sourceUserId);
-            return;
-        }
-
-        // 2. 保存通知到数据库（截取内容，避免过长）
-        String displayContent = content.length() > 50 ? content.substring(0, 50) + "..." : content;
-        Notification notification = saveNotification(userId, sourceUserId, postId, commentId, "COMMENT", 
-                sourceUser.getUsername() + " 评论了你的帖子: " + displayContent);
-
-        // 3. 构建通知消息
-        NotificationMessage message = buildNotificationMessage(notification, sourceUser);
-        message.setCommentId(commentId);
-
-        // 4. 发送WebSocket通知
-        sendNotificationToUser(userId, message);
+        notificationQueueService.sendCommentNotificationAsync(userId, sourceUserId, postId, commentId, content);
     }
 
     @Override
     public void sendFollowNotification(Long userId, Long sourceUserId) {
-        log.info("发送关注通知，用户ID: {}, 来源用户ID: {}", userId, sourceUserId);
-
-        // 1. 获取来源用户信息
-        User sourceUser = userMapper.selectById(sourceUserId);
-        if (sourceUser == null) {
-            log.warn("来源用户不存在，用户ID: {}", sourceUserId);
-            return;
-        }
-
-        // 2. 保存通知到数据库
-        Notification notification = saveNotification(userId, sourceUserId, null, null, "FOLLOW", 
-                sourceUser.getUsername() + " 关注了你");
-
-        // 3. 构建通知消息
-        NotificationMessage message = buildNotificationMessage(notification, sourceUser);
-
-        // 4. 发送WebSocket通知
-        sendNotificationToUser(userId, message);
+        log.info("发送关注通知（异步），用户ID: {}, 来源用户ID: {}", userId, sourceUserId);
+        notificationQueueService.sendFollowNotificationAsync(userId, sourceUserId);
     }
 
     @Override
     public void sendCollectNotification(Long userId, Long sourceUserId, Long postId) {
-        log.info("发送收藏通知，用户ID: {}, 来源用户ID: {}, 帖子ID: {}", userId, sourceUserId, postId);
+        log.info("发送收藏通知（异步），用户ID: {}, 来源用户ID: {}, 帖子ID: {}", userId, sourceUserId, postId);
+        notificationQueueService.sendCollectNotificationAsync(userId, sourceUserId, postId);
+    }
 
-        // 1. 获取来源用户信息
-        User sourceUser = userMapper.selectById(sourceUserId);
-        if (sourceUser == null) {
-            log.warn("来源用户不存在，用户ID: {}", sourceUserId);
-            return;
-        }
-
-        // 2. 保存通知到数据库
-        Notification notification = saveNotification(userId, sourceUserId, postId, null, "COLLECT", 
-                sourceUser.getUsername() + " 收藏了你的帖子");
-
-        // 3. 构建通知消息
-        NotificationMessage message = buildNotificationMessage(notification, sourceUser);
-
-        // 4. 发送WebSocket通知
-        sendNotificationToUser(userId, message);
+    @Override
+    public void sendCommentLikeNotification(Long userId, Long sourceUserId, Long commentId, String commentContent) {
+        log.info("发送评论点赞通知（异步），用户ID: {}, 来源用户ID: {}, 评论ID: {}", userId, sourceUserId, commentId);
+        notificationQueueService.sendCommentLikeNotificationAsync(userId, sourceUserId, commentId, commentContent);
     }
 
     @Override

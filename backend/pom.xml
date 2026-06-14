@@ -1,98 +1,371 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+<!--
+    Maven 项目配置文件
+    定义了项目的基本信息、依赖包、插件等配置
+
+    Maven 是一个项目管理和构建工具，用于：
+    1. 管理项目依赖（自动下载Jar包）
+    2. 编译打包项目
+    3. 运行测试
+    4. 生成项目文档
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- POM模型版本，固定为4.0.0 -->
     <modelVersion>4.0.0</modelVersion>
+
+    <!--
+        父项目依赖
+        使用Spring Boot作为父项目，可以继承其默认配置和依赖版本管理
+        Spring Boot会自动管理以下内容：
+        - 所有依赖的版本号
+        - 默认的编译和打包配置
+        - 内嵌服务器的版本
+        - 日志框架的配置
+    -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
+        <!-- Spring Boot版本：3.2.5（长期支持版本） -->
         <version>3.2.5</version>
-        <relativePath/> <!-- lookup parent from repository -->
+        <!-- 不使用相对路径，从Maven仓库查找父POM -->
+        <relativePath/>
     </parent>
-    <groupId>com.aihub</groupId>
-    <artifactId>ai-hub-community</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
-    <name>ai-hub-community</name>
-    <description>ai-hub-community</description>
+
+    <!-- 项目坐标信息（用于Maven定位和标识项目） -->
+    <groupId>com.aihub</groupId>           <!-- 组织ID，通常是公司域名的反转 -->
+    <artifactId>ai-hub-community</artifactId> <!-- 项目名称，唯一标识 -->
+    <version>0.0.1-SNAPSHOT</version>       <!-- 版本号，SNAPSHOT表示开发版本 -->
+    <name>ai-hub-community</name>           <!-- 项目显示名称 -->
+    <description>ai-hub-community</description> <!-- 项目描述 -->
+
+    <!-- 项目URL（可选） -->
     <url/>
+
+    <!-- 开源许可证信息（可选） -->
     <licenses>
         <license/>
     </licenses>
+
+    <!-- 项目开发者信息（可选） -->
     <developers>
         <developer/>
     </developers>
+
+    <!-- 版本控制系统信息（可选） -->
     <scm>
         <connection/>
         <developerConnection/>
         <tag/>
         <url/>
     </scm>
+
+    <!--
+        项目属性配置
+        在这里定义的属性可以在其他地方通过 ${属性名} 引用
+    -->
     <properties>
+        <!-- Java版本：21（LTS长期支持版本，支持虚拟线程等新特性） -->
         <java.version>21</java.version>
     </properties>
+
+    <!--
+        项目依赖列表
+        Maven会自动下载这些依赖及其传递依赖
+
+        依赖范围（scope）说明：
+        - compile：默认值，编译、测试、运行都有效
+        - provided：编译和测试有效，运行时不包含（如servlet-api）
+        - runtime：测试和运行有效，编译时不包含（如MySQL驱动）
+        - test：仅测试有效（如JUnit）
+    -->
     <dependencies>
+
+        <!-- ============================================
+             Spring Boot 核心starter（自动配置）
+             Starter是Spring Boot的核心概念，一站式引入相关技术栈
+        ============================================= -->
+
+        <!--
+            Spring Data Redis 依赖
+            提供了Redis的自动化配置和模板操作类
+
+            主要功能：
+            - RedisConnectionFactory 自动配置
+            - StringRedisTemplate 和 RedisTemplate 模板类
+            - 事务支持
+            - 序列化器配置（Jackson）
+
+            使用场景：
+            - 缓存数据（@Cacheable）
+            - Session共享
+            - 分布式锁
+            - 限流（滑动窗口算法）
+        -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
+
+        <!--
+            Spring Security 依赖
+            提供了全面的安全控制功能
+
+            主要功能：
+            - 用户认证（Authentication）
+            - 权限授权（Authorization）
+            - CSRF防护
+            - Session管理
+            - 密码加密（BCrypt）
+
+            使用场景：
+            - 登录认证
+            - 接口权限控制
+            - JWT Token验证
+            - 防止SQL注入、XSS攻击
+        -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
+
+        <!--
+            Spring Validation 依赖
+            提供了参数校验功能
+
+            主要功能：
+            - @Valid / @Validated 注解
+            - 常用校验注解（@NotBlank、@NotNull、@Size等）
+            - 自定义校验器
+            - 分组校验
+
+            使用场景：
+            - Controller层参数校验
+            - DTO对象属性校验
+            - 自定义业务规则校验
+        -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
+
+        <!--
+            Spring Web 依赖（核心MVC框架）
+
+            主要功能：
+            - RESTful API开发
+            - 请求映射（@GetMapping等）
+            - 视图解析（可选）
+            - 文件上传下载
+            - 异常处理（@ExceptionHandler）
+
+            使用场景：
+            - 开发Controller
+            - 处理HTTP请求响应
+            - 前后端分离后端开发
+        -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+
+        <!--
+            Spring AOP 依赖
+            提供了面向切面编程能力
+
+            主要功能：
+            - AOP代理自动创建
+            - @Before、@After、@Around通知
+            - 切点表达式（Pointcut）
+            - 切面（Aspect）
+
+            使用场景：
+            - 限流（RateLimitAspect）
+            - 日志记录
+            - 事务管理
+            - 性能监控
+            - 权限校验
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+
+        <!--
+            Spring WebSocket 依赖
+            提供了实时双向通信能力
+
+            主要功能：
+            - WebSocket连接管理
+            - STOMP协议支持
+            - 消息代理配置
+            - 心跳检测
+
+            使用场景：
+            - 实时聊天
+            - 消息通知推送
+            - 在线状态同步
+            - 协同编辑
+        -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-websocket</artifactId>
         </dependency>
 
+        <!-- ============================================
+             数据库相关依赖
+        ============================================= -->
+
+        <!--
+            MySQL数据库驱动
+
+            说明：
+            - scope为runtime，表示仅运行时需要，编译时不需要
+            - Spring Boot会自动配置数据源
+            - 支持MySQL 8.0+的所有特性
+
+            使用场景：
+            - MyBatis/MyBatis-Plus数据库操作
+            - JDBC操作
+            - 数据库连接池（HikariCP默认）
+        -->
         <dependency>
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
             <scope>runtime</scope>
         </dependency>
+
+        <!--
+            Lombok 依赖
+            是一个代码生成工具，通过注解简化Java代码
+
+            常用注解：
+            - @Data：自动生成getter/setter/equals/hashCode/toString
+            - @Getter/@Setter：单独生成getter/setter
+            - @NoArgsConstructor：生成无参构造器
+            - @AllArgsConstructor：生成全参构造器
+            - @RequiredArgsConstructor：生成final字段构造器
+            - @Slf4j：自动生成Logger
+
+            优点：
+            - 减少样板代码
+            - 代码更简洁易读
+            - 提高开发效率
+
+            注意：
+            - 需要IDE安装Lombok插件
+            - 需要配置annotationProcessor
+        -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
+
+        <!--
+            Spring Boot测试依赖
+
+            包含：
+            - JUnit 5（主流测试框架）
+            - Spring Test（Spring测试支持）
+            - AssertJ（断言库）
+            - Mockito（模拟对象）
+
+            scope为test，仅在测试时使用
+        -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
 
-        <!-- MyBatis-Plus -->
+        <!-- ============================================
+             第三方框架依赖
+        ============================================= -->
+
+        <!--
+            MyBatis-Plus ORM框架
+
+            核心功能：
+            - CRUD操作只需继承BaseMapper，无需编写SQL
+            - 强大的条件构造器（QueryWrapper/LambdaQueryWrapper）
+            - 自动填充（createTime/updateTime）
+            - 逻辑删除（@TableLogic）
+            - 分页插件（PaginationInnerInterceptor）
+            - 性能分析
+            - ActiveRecord模式
+
+            版本：3.5.7（支持Spring Boot 3.x）
+
+            使用场景：
+            - 数据库表操作
+            - 复杂条件查询
+            - 分页查询
+            - 树形结构查询
+        -->
         <dependency>
             <groupId>com.baomidou</groupId>
             <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
             <version>3.5.7</version>
         </dependency>
 
-        <!-- Spring AI OpenAI (支持 DeepSeek 等) -->
+        <!--
+            Spring AI OpenAI Starter
+
+            核心功能：
+            - 统一的大模型调用接口
+            - 支持多种大模型（OpenAI、DeepSeek、Azure OpenAI等）
+            - 流式输出支持（SSE）
+            - 对话历史管理
+            - 向量数据库支持（可选）
+
+            版本：1.0.0-M1（Milestone版本）
+
+            使用场景：
+            - AI对话机器人
+            - 智能客服
+            - 内容生成
+            - 文本分析
+        -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-openai-spring-boot-starter</artifactId>
             <version>1.0.0-M1</version>
         </dependency>
 
-        <!-- JWT -->
+        <!--
+            JWT（JSON Web Token）库
+
+            JWT是一种开放标准（RFC 7519），用于在各方之间安全地传输信息
+
+            三个组成部分：
+            - Header（头部）：包含令牌类型和签名算法
+            - Payload（载荷）：包含声明（Claims）
+            - Signature（签名）：验证消息未被篡改
+
+            JJWT是Java实现，包含三个子模块：
+        -->
+
+        <!-- JJWT API：JWT令牌创建和解析的核心API -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-api</artifactId>
             <version>0.12.6</version>
         </dependency>
+
+        <!-- JJWT Impl：JWT签名实现的默认实现 -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-impl</artifactId>
             <version>0.12.6</version>
             <scope>runtime</scope>
         </dependency>
+
+        <!-- JJWT Jackson：使用Jackson进行JSON序列化 -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-jackson</artifactId>
@@ -100,24 +373,97 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- 阿里云OSS SDK -->
+        <!--
+            阿里云OSS（对象存储服务）SDK
+
+            核心功能：
+            - 文件上传下载
+            - 存储空间管理
+            - 权限控制
+            - 图片处理（缩放、裁剪、水印等）
+
+            版本：3.17.4
+
+            使用场景：
+            - 用户头像存储
+            - 帖子图片/视频存储
+            - 文件分享
+            - 静态资源CDN加速
+        -->
         <dependency>
             <groupId>com.aliyun.oss</groupId>
             <artifactId>aliyun-sdk-oss</artifactId>
             <version>3.17.4</version>
         </dependency>
 
+        <!--
+            SpringDoc OpenAPI（Swagger）文档生成
+
+            核心功能：
+            - 自动生成API文档
+            - 在线接口测试
+            - 接口分组管理
+            - 文档排序和搜索
+
+            版本：2.3.0
+
+            Swagger UI访问地址：
+            - /swagger-ui.html（传统UI）
+            - /v3/api-docs（OpenAPI JSON）
+
+            使用场景：
+            - 前后端分离开发
+            - 接口文档维护
+            - API自动化测试
+        -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>2.3.0</version>
+        </dependency>
+
     </dependencies>
 
+    <!--
+        Maven仓库配置
+
+        默认情况下Maven会从Maven中央仓库下载依赖
+        但Spring AI等部分依赖在里程碑版本需要额外配置仓库
+    -->
     <repositories>
+        <!-- Spring里程碑版本仓库 -->
         <repository>
             <id>spring-milestones</id>
             <url>https://repo.spring.io/milestone</url>
         </repository>
     </repositories>
 
+    <!--
+        Maven构建配置
+
+        定义项目构建过程中的各种插件和配置
+    -->
     <build>
+
+        <!--
+            Maven插件列表
+
+            插件是在Maven构建生命周期中执行特定任务的组件
+        -->
         <plugins>
+
+            <!--
+                Spring Boot Maven插件
+
+                主要功能：
+                - 打包可执行的JAR文件（包含所有依赖）
+                - 内嵌Tomcat/Jetty服务器
+                - 运行Spring Boot应用（spring-boot:run）
+                - 重新打包功能
+
+                配置说明：
+                - excludes：排除Lombok的打包（因为Lombok是编译时注解，不需要打包）
+            -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
@@ -130,12 +476,28 @@
                     </excludes>
                 </configuration>
             </plugin>
+
+            <!--
+                Maven编译插件
+
+                配置Java编译选项：
+                - source：源代码兼容的Java版本
+                - target：生成的class文件兼容的Java版本
+                - annotationProcessorPaths：配置注解处理器（用于Lombok）
+
+                注意：
+                - 需要指定Lombok的版本
+                - 确保编译时能够正确处理注解
+            -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
+                    <!-- 源代码Java版本 -->
                     <source>${java.version}</source>
+                    <!-- 目标Java版本 -->
                     <target>${java.version}</target>
+                    <!-- 注解处理器配置（支持Lombok） -->
                     <annotationProcessorPaths>
                         <path>
                             <groupId>org.projectlombok</groupId>
@@ -145,6 +507,7 @@
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
+
         </plugins>
     </build>
 

@@ -1,0 +1,27 @@
+# Maven
+target/
+*.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# 环境配置（不要打进镜像）
+.env
+.env.*
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# 文档
+*.md
+HELP.md
+
+# SQL 脚本（通过 docker-compose volume 挂载，不打包进镜像）
+*.sql
+
+# 脚本
+start.sh

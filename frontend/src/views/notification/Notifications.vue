@@ -94,6 +94,7 @@ const filters = ref({
 const getTypeIcon = (type) => {
   const icons = {
     COMMENT: MessageSquare,
+    COMMENT_LIKE: Heart,
     LIKE: Heart,
     COLLECT: Bookmark,
     FOLLOW: UserPlus,
@@ -105,6 +106,7 @@ const getTypeIcon = (type) => {
 const getTypeColor = (type) => {
   const colors = {
     COMMENT: 'bg-blue-100 text-blue-600',
+    COMMENT_LIKE: 'bg-pink-100 text-pink-600',
     LIKE: 'bg-red-100 text-red-600',
     COLLECT: 'bg-yellow-100 text-yellow-600',
     FOLLOW: 'bg-green-100 text-green-600',
@@ -170,6 +172,8 @@ const markNotificationAsRead = async (notificationId) => {
     if (notification) {
       notification.isRead = true
     }
+    // 通知 NavHeader 更新未读计数
+    window.dispatchEvent(new Event('notification-updated'))
   } catch (e) {
     console.error('标记已读失败:', e)
   }
@@ -179,6 +183,8 @@ const markAllRead = async () => {
   try {
     await markAllAsRead()
     notifications.value.forEach(n => n.isRead = true)
+    // 通知 NavHeader 更新未读计数
+    window.dispatchEvent(new Event('notification-updated'))
   } catch (e) {
     console.error('全部标记已读失败:', e)
   }

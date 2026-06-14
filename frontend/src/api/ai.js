@@ -21,3 +21,10 @@ export function deleteSession(sessionId) {
     method: 'delete'
   })
 }
+
+export function getSessionMessages(sessionId) {
+  return request({
+    url: `/ai/session/${sessionId}/messages`,
+    method: 'get'
+  })
+}

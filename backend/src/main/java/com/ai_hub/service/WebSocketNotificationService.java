@@ -45,6 +45,16 @@ public interface WebSocketNotificationService {
     void sendCollectNotification(Long userId, Long sourceUserId, Long postId);
 
     /**
+     * 发送评论点赞通知
+     *
+     * @param userId 接收通知的用户ID（评论作者）
+     * @param sourceUserId 发起点赞的用户ID
+     * @param commentId 被点赞的评论ID
+     * @param commentContent 评论内容（用于显示）
+     */
+    void sendCommentLikeNotification(Long userId, Long sourceUserId, Long commentId, String commentContent);
+
+    /**
      * 发送系统通知
      *
      * @param userId 接收通知的用户ID

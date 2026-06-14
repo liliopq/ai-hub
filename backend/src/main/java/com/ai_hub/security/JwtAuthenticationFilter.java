@@ -1,5 +1,7 @@
 package com.ai_hub.security;
 
+import com.ai_hub.entity.User;
+import com.ai_hub.mapper.UserMapper;
 import com.ai_hub.utils.JwtTokenProvider;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -30,6 +32,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final StringRedisTemplate redisTemplate;      // Redis 操作，用于检查 Token 黑名单
+    private final UserMapper userMapper;                  // 用户 Mapper，用于校验 Token 版本号
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -39,19 +42,41 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String jwt = getJwtFromRequest(request);
 
             if (StringUtils.hasText(jwt) && jwtTokenProvider.validateToken(jwt)) {
-                // 检查 Token 是否在黑名单中
-                String blacklistKey = "jwt:blacklist:" + jwt;
-                Boolean isBlacklisted = redisTemplate.hasKey(blacklistKey);
-                if (Boolean.TRUE.equals(isBlacklisted)) {
-                    log.warn("Token 已在黑名单中，拒绝访问");
+                // 检查 Token 是否在黑名单中（如果 Redis 可用）
+                if (isRedisAvailable()) {
+                    String blacklistKey = "jwt:blacklist:" + jwt;
+                    Boolean isBlacklisted = redisTemplate.hasKey(blacklistKey);
+                    if (Boolean.TRUE.equals(isBlacklisted)) {
+                        log.warn("Token 已在黑名单中，拒绝访问");
+                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                        response.setContentType("application/json;charset=UTF-8");
+                        response.getWriter().write("{\"code\":401,\"message\":\"Token已失效，请重新登录\",\"data\":null}");
+                        return;
+                    }
+                }
+
+                // 校验 Token 版本号：比对 Token 中的版本号与数据库中的版本号
+                Long userId = jwtTokenProvider.getUserIdFromToken(jwt);
+                Integer tokenVersion = jwtTokenProvider.getTokenVersionFromToken(jwt);
+                User user = userMapper.selectById(userId);
+                if (user == null) {
+                    log.warn("Token 对应的用户不存在，用户ID: {}", userId);
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     response.setContentType("application/json;charset=UTF-8");
-                    response.getWriter().write("{\"code\":401,\"message\":\"Token已失效，请重新登录\",\"data\":null}");
+                    response.getWriter().write("{\"code\":401,\"message\":\"用户不存在\",\"data\":null}");
                     return;
                 }
-                
+                int dbTokenVersion = user.getTokenVersion() != null ? user.getTokenVersion() : 0;
+                int tokenVersionInToken = tokenVersion != null ? tokenVersion : 0;
+                if (tokenVersionInToken != dbTokenVersion) {
+                    log.warn("Token 版本号不匹配，用户ID: {}, Token版本: {}, 数据库版本: {}", userId, tokenVersion, dbTokenVersion);
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json;charset=UTF-8");
+                    response.getWriter().write("{\"code\":401,\"message\":\"密码已修改，Token已失效，请重新登录\",\"data\":null}");
+                    return;
+                }
+
                 String username = jwtTokenProvider.getUsernameFromToken(jwt);
-                Long userId = jwtTokenProvider.getUserIdFromToken(jwt);
 
                 // 创建认证对象
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
@@ -69,6 +94,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * 检查 Redis 是否可用
+     *
+     * @return true 表示可用，false 表示不可用
+     */
+    private boolean isRedisAvailable() {
+        try {
+            // 尝试执行一个简单的操作来检查 Redis 连接
+            redisTemplate.getConnectionFactory().getConnection().ping();
+            return true;
+        } catch (Exception e) {
+            log.warn("Redis 不可用，将跳过 Token 黑名单检查: {}", e.getMessage());
+            return false;
+        }
     }
 
     /**

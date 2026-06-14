@@ -14,7 +14,7 @@ public class Notification {
     private Long id;
 
     private Long userId;
-    private String type;        // COMMENT, LIKE, FOLLOW, SYSTEM
+    private String type;        // COMMENT, COMMENT_LIKE, LIKE, COLLECT, FOLLOW, SYSTEM
     private Long sourceUserId;
     private Long sourcePostId;
     private Long sourceCommentId;

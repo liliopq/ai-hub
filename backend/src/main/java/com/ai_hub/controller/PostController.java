@@ -1,5 +1,6 @@
 package com.ai_hub.controller;
 
+import com.ai_hub.annotation.RateLimit;
 import com.ai_hub.dto.request.CreatePostRequest;
 import com.ai_hub.dto.request.LikeRequest;
 import com.ai_hub.dto.request.PostListRequest;
@@ -9,6 +10,9 @@ import com.ai_hub.entity.User;
 import com.ai_hub.mapper.UserMapper;
 import com.ai_hub.service.PostService;
 import com.ai_hub.utils.TokenValidator;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +27,7 @@ import java.util.List;
 @RequestMapping("/api/post")                   // 请求路径
 @RestController                            // RESTful 控制器, 返回 JSON
 @RequiredArgsConstructor                   // 生成构造函数
+@Tag(name = "帖子管理", description = "帖子的增删改查、点赞、收藏等接口")
 public class PostController {
 
     private final PostService postService;
@@ -37,6 +42,8 @@ public class PostController {
      * @return 响应结果
      */
     @PostMapping
+    @RateLimit(maxRequests = 5, timeWindow = 60, message = "发布帖子过于频繁，请稍后重试")
+    @Operation(summary = "发布帖子", description = "创建新帖子，需要登录")
     public Result<CreatePostResponse> createPost(@RequestHeader(value = "Authorization", required = false) String authorization,
                                            @Valid @RequestBody CreatePostRequest request) {
         log.info("发布帖子，标题: {}", request.getTitle());
@@ -67,13 +74,15 @@ public class PostController {
      * @return 分页结果
      */
     @GetMapping("/list")
+    @Operation(summary = "获取帖子列表", description = "分页获取帖子列表，支持分类、标签、关键词筛选和排序")
     public Result<PageResult<PostListItemResponse>> getPostList(
-            @RequestParam(required = false, defaultValue = "1") Integer page,
-            @RequestParam(required = false, defaultValue = "10") Integer size,
-            @RequestParam(required = false) String category,
-            @RequestParam(required = false) String tag,
-            @RequestParam(required = false) String keyword,
-            @RequestParam(required = false, defaultValue = "time") String sortBy) {
+            @RequestParam(required = false, defaultValue = "1") Integer page,  // 页码
+            @RequestParam(required = false, defaultValue = "10") Integer size,  // 每页条数
+            @RequestParam(required = false) String category,   // 分类
+            @RequestParam(required = false) String tag,        // 标签
+            @RequestParam(required = false) String keyword,    // 搜索关键词
+            @RequestParam(required = false, defaultValue = "time") String sortBy // 排序
+    ) {
         log.info("获取帖子列表，页码: {}, 每页条数: {}, 分类: {}, 标签: {}, 关键词: {}, 排序: {}",
                 page, size, category, tag, keyword, sortBy);
         
@@ -202,6 +211,7 @@ public class PostController {
      * @return 点赞响应
      */
     @PostMapping("/{postId}/like")
+    @RateLimit(maxRequests = 10, timeWindow = 60, message = "点赞操作过于频繁，请稍后重试")
     public Result<LikeResponse> toggleLike(
             @PathVariable Long postId,
             @RequestHeader("Authorization") String authorization,
@@ -232,6 +242,7 @@ public class PostController {
      * @return 收藏响应
      */
     @PostMapping("/{postId}/collect")
+    @RateLimit(maxRequests = 10, timeWindow = 60, message = "收藏操作过于频繁，请稍后重试")
     public Result<CollectResponse> toggleCollect(
             @PathVariable Long postId,
             @RequestHeader("Authorization") String authorization,
