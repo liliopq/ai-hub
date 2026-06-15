@@ -8,37 +8,22 @@
 
 ```mermaid
 graph TB
-    CLIENT[客户端<br/>Vue 3 SPA]
+    BROWSER[Browser]
+    NGINX[Nginx<br/>反向代理]
+    SPRING[Spring Boot<br/>Port 8080]
 
-    subgraph 接入层
-        NGINX[Nginx 反向代理<br/>静态资源托管 / SSL / 负载均衡]
-    end
+    MYSQL[(MySQL<br/>3306)]
+    REDIS[(Redis<br/>6379)]
+    OSS[(阿里云 OSS)]
 
-    subgraph 应用层
-        SECURITY[Spring Security + JWT Filter<br/>认证 / 鉴权 / Token 版本号校验]
-        BIZ[业务模块<br/>Auth / Post / Comment / User<br/>Notification / AI Chat / Admin]
-        INFRA[基础设施<br/>声明式缓存 / AOP 限流 / 异步线程池]
-    end
+    BROWSER --> NGINX
+    NGINX --> SPRING
+    SPRING --> MYSQL
+    SPRING --> REDIS
+    SPRING --> OSS
 
-    subgraph 数据层
-        MYSQL[(MySQL 8.0<br/>11 张业务表)]
-        REDIS[(Redis 7<br/>缓存 / 限流计数器 / Token 黑名单)]
-    end
-
-    subgraph 外部服务
-        AI_API[DeepSeek API]
-        OSS[阿里云 OSS]
-    end
-
-    CLIENT --> NGINX
-    NGINX --> SECURITY
-    SECURITY --> BIZ
-    BIZ --> INFRA
-    BIZ --> MYSQL
-    INFRA --> REDIS
-    SECURITY --> REDIS
-    BIZ --> AI_API
-    BIZ --> OSS
+    MYSQL -.- MYSQL_DESC[持久化存储]
+    REDIS -.- REDIS_DESC[缓存 + 限流 + Pub/Sub]
 ```
 
 ---
