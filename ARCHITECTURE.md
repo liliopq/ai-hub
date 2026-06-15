@@ -82,9 +82,9 @@ graph TB
     AI --> AI_SVC
     NOTIFY --> NOTIFY_SVC
 
-    POST_SVC -.->|@Cacheable| CACHE
-    POST_SVC -.->|@RateLimit| AOP_LIMIT
-    POST_SVC -.->|@Async| ASYNC
+    POST_SVC -.->|"@Cacheable"| CACHE
+    POST_SVC -.->|"@RateLimit"| AOP_LIMIT
+    POST_SVC -.->|"@Async"| ASYNC
 
     USER_SVC --> MYSQL
     POST_SVC --> MYSQL
@@ -186,7 +186,7 @@ graph LR
         ENTITY[entity/<br/>11 个实体]
         SEC[security/<br/>JWT Filter + 权限评估器]
         ASPECT[aspect/<br/>限流 AOP]
-        ANNO[annotation/<br/>@RateLimit]
+        ANNO["annotation/<br/>@RateLimit"]
         DTO[dto/<br/>请求/响应]
         UTILS[utils/<br/>JWT/TokenValidator]
     end
