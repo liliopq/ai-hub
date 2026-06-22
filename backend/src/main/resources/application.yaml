@@ -82,6 +82,57 @@ spring:
           temperature: 0.7
 
   # ============================================================
+  # RabbitMQ 消息队列配置
+  # ============================================================
+  # RabbitMQ 用于通知异步化处理，解耦通知产生与消费
+  # 评论、点赞、关注等通知通过消息队列异步发送，提升主业务响应速度
+  rabbitmq:
+    # RabbitMQ 服务器地址
+    host: ${RABBITMQ_HOST:localhost}
+
+    # RabbitMQ 服务器端口
+    port: ${RABBITMQ_PORT:5672}
+
+    # RabbitMQ 用户名
+    username: ${RABBITMQ_USERNAME:guest}
+
+    # RabbitMQ 密码
+    password: ${RABBITMQ_PASSWORD:guest}
+
+    # 虚拟主机（类似数据库的 database 概念，用于隔离不同业务）
+    virtual-host: /
+
+    # 消息发送确认机制（publisher-confirm）
+    # 确保消息成功到达 Exchange
+    publisher-confirm-type: correlated
+
+    # 消息返回机制（publisher-return）
+    # 当消息无法从 Exchange 路由到 Queue 时触发回调
+    publisher-returns: true
+
+    # 消费者配置
+    listener:
+      simple:
+        # 消费者并发数（最小工作线程数）
+        concurrency: 2
+
+        # 消费者最大并发数（最大工作线程数）
+        max-concurrency: 5
+
+        # 手动确认模式（确保消息被成功处理后才从队列中移除）
+        acknowledge-mode: auto
+
+        # 消费者预取数量（每个消费者一次拉取的消息数，避免单个消费者积压）
+        prefetch: 10
+
+        # 消费者重试配置
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1000
+          multiplier: 2
+
+  # ============================================================
   # Redis缓存配置
   # ============================================================
   data:

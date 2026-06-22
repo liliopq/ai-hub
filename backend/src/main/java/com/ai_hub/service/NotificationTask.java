@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 
 /**
  * 通知任务
- * 用于 Redis 队列异步处理通知
+ * 用于 RabbitMQ 消息队列异步处理通知
  */
 @Data
 @Builder

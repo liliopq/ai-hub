@@ -61,4 +61,8 @@ ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar \
     --spring.data.redis.host=${REDIS_HOST:-redis} \
     --spring.data.redis.port=${REDIS_PORT:-6379} \
     --spring.data.redis.password=${REDIS_PASSWORD:-} \
+    --spring.rabbitmq.host=${RABBITMQ_HOST:-rabbitmq} \
+    --spring.rabbitmq.port=${RABBITMQ_PORT:-5672} \
+    --spring.rabbitmq.username=${RABBITMQ_USERNAME:-guest} \
+    --spring.rabbitmq.password=${RABBITMQ_PASSWORD:-guest} \
     --cors.allowed-origins=${CORS_ORIGINS:-http://localhost}"]

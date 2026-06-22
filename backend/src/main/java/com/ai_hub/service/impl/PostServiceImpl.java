@@ -444,7 +444,7 @@ public class PostServiceImpl implements PostService {
         log.info("帖子ID: {}, 操作用户ID: {}, 角色: {}, 时间: {}", postId, userId, userRole, java.time.LocalDateTime.now());
 
         try {
-        Post post = postMapper.selectById(postId);
+            Post post = postMapper.selectById(postId);
             if (post == null) {
                 log.error("删除失败：帖子不存在，帖子ID: {}", postId);
                 throw new RuntimeException(ErrorCode.POST_NOT_FOUND.getMessage());

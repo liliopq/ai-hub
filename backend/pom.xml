@@ -196,6 +196,27 @@
         </dependency>
 
         <!--
+            Spring AMQP (RabbitMQ) 依赖
+            提供了消息队列的异步通信能力
+
+            主要功能：
+            - RabbitTemplate 消息发送模板
+            - @RabbitListener 注解驱动消费者
+            - Exchange/Queue/Binding 声明式配置
+            - 消息确认（ACK）与重试机制
+            - 消息序列化（Jackson JSON）
+
+            使用场景：
+            - 通知异步化处理（评论、点赞、关注等通知解耦）
+            - 异步任务队列
+            - 服务间事件驱动通信
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+
+        <!--
             Spring WebSocket 依赖
             提供了实时双向通信能力
 

@@ -103,24 +103,4 @@ public class WebSocketNotificationServiceImpl implements WebSocketNotificationSe
         return notification;
     }
 
-    /**
-     * 构建通知消息
-     */
-    private NotificationMessage buildNotificationMessage(Notification notification, User sourceUser) {
-        NotificationMessage.UserBasicInfo userInfo = NotificationMessage.UserBasicInfo.builder()
-                .id(sourceUser.getId())
-                .username(sourceUser.getUsername())
-                .avatar(sourceUser.getAvatar())
-                .build();
-
-        return NotificationMessage.builder()
-                .id(notification.getId())
-                .type(notification.getType())
-                .content(notification.getContent())
-                .sourceUser(userInfo)
-                .postId(notification.getSourcePostId())
-                .isRead(false)
-                .createTime(notification.getCreateTime())
-                .build();
-    }
 }
