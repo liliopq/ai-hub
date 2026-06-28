@@ -162,28 +162,6 @@ public class AdminController {
     }
 
     /**
-     * 加精/取消加精帖子
-     *
-     * @param authorization Authorization头
-     * @param postId 帖子ID
-     * @param request 加精状态请求
-     * @return 操作结果
-     */
-    @PutMapping("/posts/{postId}/essence")
-    @PreAuthorize("hasRole('ADMIN')")
-    public Result<Void> updatePostEssence(
-            @RequestHeader("Authorization") String authorization,
-            @PathVariable Long postId,
-            @Valid @RequestBody UpdatePostEssenceRequest request) {
-        log.info("更新帖子加精状态请求，帖子ID: {}, 新状态: {}", postId, request.getEssence());
-
-        // 执行更新
-        adminService.updatePostEssence(postId, request.getEssence());
-
-        return Result.success("操作成功", null);
-    }
-
-    /**
      * 删除任何评论
      *
      * @param authorization Authorization头

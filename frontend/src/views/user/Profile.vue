@@ -8,16 +8,16 @@
         <h1 class="text-2xl font-bold text-gray-900 mb-6">个人中心</h1>
         <div class="flex items-start space-x-6 mb-8">
           <div class="relative">
-            <img 
-              :src="user.avatar || defaultAvatar" 
+            <img
+              :src="user.avatar || defaultAvatar"
               :alt="user.username"
               class="w-24 h-24 rounded-full object-cover border-4 border-gray-100"
             />
             <label class="absolute bottom-0 right-0 w-8 h-8 bg-primary-600 rounded-full cursor-pointer hover:bg-primary-700 transition-colors flex items-center justify-center">
               <Upload class="w-4 h-4 text-white" />
-              <input 
-                type="file" 
-                accept="image/*" 
+              <input
+                type="file"
+                accept="image/*"
                 class="hidden"
                 @change="handleAvatarUpload"
               />
@@ -25,11 +25,21 @@
           </div>
           <div class="flex-1">
             <h2 class="text-xl font-semibold text-gray-900 mb-1">{{ user.username }}</h2>
-            <p class="text-gray-500 mb-4">{{ user.email || '未设置邮箱' }}</p>
+            <p class="text-gray-500 mb-2">{{ user.email || '未设置邮箱' }}</p>
             <div class="flex items-center space-x-4 text-sm text-gray-500">
               <span>注册时间：{{ formatDate(user.createTime) }}</span>
               <span v-if="user.phoneNumber">手机号：{{ user.phoneNumber }}</span>
             </div>
+          </div>
+          <div class="flex space-x-6">
+            <button @click="showFollowList('following')" class="text-center hover:bg-gray-50 rounded-lg px-2 py-1 transition-colors cursor-pointer w-16">
+              <p class="text-xl font-bold text-gray-900">{{ followStats.followingCount }}</p>
+              <p class="text-xs text-gray-500">关注</p>
+            </button>
+            <button @click="showFollowList('followers')" class="text-center hover:bg-gray-50 rounded-lg px-2 py-1 transition-colors cursor-pointer w-16">
+              <p class="text-xl font-bold text-gray-900">{{ followStats.followerCount }}</p>
+              <p class="text-xs text-gray-500">粉丝</p>
+            </button>
           </div>
         </div>
         
@@ -185,23 +195,73 @@
           {{ message }}
         </div>
       </div>
+
+      <!-- 关注/粉丝列表弹窗 -->
+      <div v-if="followListModal" class="fixed inset-0 z-50 overflow-y-auto" @click.self="followListModal = false">
+        <div class="flex items-center justify-center min-h-screen px-4">
+          <div class="fixed inset-0 bg-black bg-opacity-40 transition-opacity"></div>
+          <div class="relative bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-semibold text-gray-900">
+                {{ followListType === 'following' ? '我的关注' : '我的粉丝' }}
+              </h3>
+              <button @click="followListModal = false" class="text-gray-400 hover:text-gray-600">
+                <X class="w-5 h-5" />
+              </button>
+            </div>
+            <div v-if="followListLoading" class="text-center py-8">
+              <Loader2 class="w-6 h-6 text-primary-600 animate-spin mx-auto" />
+            </div>
+            <div v-else-if="followList.length === 0" class="text-center py-8 text-gray-500">
+              {{ followListType === 'following' ? '还没有关注任何人' : '还没有粉丝' }}
+            </div>
+            <div v-else class="space-y-3 max-h-96 overflow-y-auto">
+              <div
+                v-for="item in followList"
+                :key="item.id"
+                class="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer"
+                @click="goToUser(item.id)"
+              >
+                <img :src="item.avatar || defaultAvatar" :alt="item.username" class="w-10 h-10 rounded-full object-cover" />
+                <div class="flex-1">
+                  <p class="text-sm font-medium text-gray-900">{{ item.username }}</p>
+                  <p class="text-xs text-gray-400">
+                    <span class="inline-block px-1.5 py-0.5 bg-gray-100 rounded text-xs">
+                      {{ item.role === 'ADMIN' ? '管理员' : '普通用户' }}
+                    </span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
-import { Loader2, Upload, Heart, MessageSquare } from 'lucide-vue-next'
+import { useRouter } from 'vue-router'
+import { Loader2, Upload, Heart, MessageSquare, X } from 'lucide-vue-next'
 import { getUserInfo, updateUserInfo, changePassword } from '../../api/user'
 import { uploadAvatar } from '../../api/file'
 import { setUser, getUserId } from '../../utils/auth'
 import { getUserPosts, getUserLikedPosts, getUserCollectedPosts } from '../../api/post'
+import { getFollowCounts, getFollowingList, getFollowerList } from '../../api/follow'
 
 const user = ref({})
 const loading = ref(false)
 const message = ref('')
 const messageType = ref('success')
 const defaultAvatar = 'https://via.placeholder.com/150'
+
+// 关注/粉丝
+const followStats = ref({ followingCount: 0, followerCount: 0 })
+const followListModal = ref(false)
+const followListType = ref('following')
+const followList = ref([])
+const followListLoading = ref(false)
 
 // 帖子相关
 const activeTab = ref('my')
@@ -230,7 +290,8 @@ const passwordForm = reactive({
 
 const formatDate = (time) => {
   if (!time) return ''
-  const date = new Date(time)
+  // 后端返回 Asia/Shanghai 时间，手动加时区偏移
+  const date = new Date(time.indexOf('+') === -1 && time.indexOf('Z') === -1 ? time + '+08:00' : time)
   return date.toLocaleDateString('zh-CN')
 }
 
@@ -246,6 +307,39 @@ const loadUser = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const loadFollowStats = async () => {
+  try {
+    const data = await getFollowCounts(user.value.id)
+    followStats.value = data
+  } catch (e) {
+    console.error('获取关注统计数据失败:', e)
+  }
+}
+
+const showFollowList = async (type) => {
+  followListType.value = type
+  followListModal.value = true
+  followListLoading.value = true
+  followList.value = []
+  try {
+    const data = type === 'following'
+      ? await getFollowingList(user.value.id)
+      : await getFollowerList(user.value.id)
+    followList.value = data
+  } catch (e) {
+    console.error('获取列表失败:', e)
+  } finally {
+    followListLoading.value = false
+  }
+}
+
+const router = useRouter()
+
+const goToUser = (userId) => {
+  followListModal.value = false
+  router.push(`/user/${userId}`)
 }
 
 const handleAvatarUpload = async (event) => {
@@ -373,8 +467,9 @@ watch(activeTab, () => {
   loadPosts(1)
 })
 
-onMounted(() => {
-  loadUser()
+onMounted(async () => {
+  await loadUser()
   loadPosts(1)
+  loadFollowStats()
 })
 </script>

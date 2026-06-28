@@ -197,9 +197,22 @@ public class AdminServiceImpl implements AdminService {
         // 生成内容摘要（前100个字符）
         String contentSummary = null;
         if (post.getContent() != null) {
-            contentSummary = post.getContent().length() > 100 
-                    ? post.getContent().substring(0, 100) + "..." 
+            contentSummary = post.getContent().length() > 100
+                    ? post.getContent().substring(0, 100) + "..."
                     : post.getContent();
+        }
+
+        // 查询作者信息
+        AdminPostResponse.UserBasicInfo userInfo = null;
+        if (post.getUserId() != null) {
+            User postUser = userMapper.selectById(post.getUserId());
+            if (postUser != null) {
+                userInfo = AdminPostResponse.UserBasicInfo.builder()
+                        .id(postUser.getId())
+                        .username(postUser.getUsername())
+                        .avatar(postUser.getAvatar())
+                        .build();
+            }
         }
 
         return AdminPostResponse.builder()
@@ -214,11 +227,11 @@ public class AdminServiceImpl implements AdminService {
                 .collectCount(post.getCollectCount())
                 .commentCount(post.getCommentCount())
                 .isSticky(post.getIsSticky())
-                .isEssence(post.getIsEssence())
                 .status(post.getStatus())
                 .createTime(post.getCreateTime())
                 .updateTime(post.getUpdateTime())
                 .deleted(post.getDeleted())
+                .user(userInfo)
                 .build();
     }
 
@@ -252,6 +265,10 @@ public class AdminServiceImpl implements AdminService {
 
         // 4. 更新状态
         post.setStatus(status);
+        if (status == 2) {
+            // 删除操作：标记逻辑删除，之后查询不再显示
+            post.setDeleted(1);
+        }
         postMapper.updateById(post);
 
         String action;
@@ -302,39 +319,6 @@ public class AdminServiceImpl implements AdminService {
         postMapper.updateById(post);
 
         String action = sticky ? "置顶" : "取消置顶";
-        log.info("帖子{}成功，帖子ID: {}", action, postId);
-    }
-
-    /**
-     * 加精/取消加精帖子
-     *
-     * @param postId 帖子ID
-     * @param essence 是否加精 (true:加精, false:取消加精)
-     */
-    @Override
-    public void updatePostEssence(Long postId, Boolean essence) {
-        log.info("更新帖子加精状态，帖子ID: {}, 新状态: {}", postId, essence);
-
-        // 1. 查询帖子
-        Post post = postMapper.selectById(postId);
-        if (post == null) {
-            throw new RuntimeException("帖子不存在");
-        }
-
-        // 2. 转换为数据库存储的值 (true -> 1, false -> 0)
-        Integer essenceValue = essence ? 1 : 0;
-
-        // 3. 如果状态没有变化，直接返回
-        if (post.getIsEssence().equals(essenceValue)) {
-            log.info("帖子加精状态未变化，无需更新");
-            return;
-        }
-
-        // 4. 更新状态
-        post.setIsEssence(essenceValue);
-        postMapper.updateById(post);
-
-        String action = essence ? "加精" : "取消加精";
         log.info("帖子{}成功，帖子ID: {}", action, postId);
     }
 

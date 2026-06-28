@@ -40,14 +40,6 @@ export function setPostSticky(postId, data) {
   })
 }
 
-export function setPostEssence(postId, data) {
-  return request({
-    url: `/admin/posts/${postId}/essence`,
-    method: 'put',
-    data
-  })
-}
-
 export function deleteComment(commentId) {
   return request({
     url: `/admin/comments/${commentId}`,

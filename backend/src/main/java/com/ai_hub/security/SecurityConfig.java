@@ -77,8 +77,16 @@ public class SecurityConfig {
                         .requestMatchers("/api/post/{postId}").permitAll()
                         .requestMatchers("/api/comment/list/{postId}").permitAll()
                         .requestMatchers("/api/user/{userId}").permitAll()
+                        // 关注相关公开接口（统计和列表无需认证）
+                        .requestMatchers("/api/follow/count/**").permitAll()
+                        .requestMatchers("/api/follow/following/**").permitAll()
+                        .requestMatchers("/api/follow/followers/**").permitAll()
                         // AI 对话接口
                         .requestMatchers("/api/ai/**").permitAll()
+                        // Swagger / OpenAPI 文档
+                        .requestMatchers("/swagger-ui.html").permitAll()
+                        .requestMatchers("/swagger-ui/**").permitAll()
+                        .requestMatchers("/v3/api-docs/**").permitAll()
                         // WebSocket 端点允许跨域
                         .requestMatchers("/ws/**").permitAll()
                         .requestMatchers("/api/ws/**").permitAll()

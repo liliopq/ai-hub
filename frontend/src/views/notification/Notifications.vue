@@ -116,7 +116,8 @@ const getTypeColor = (type) => {
 }
 
 const formatTime = (time) => {
-  const date = new Date(time)
+  // 后端返回 Asia/Shanghai 时间，手动加时区偏移避免 JS 按 UTC 解析
+  const date = new Date(time.indexOf('+') === -1 && time.indexOf('Z') === -1 ? time + '+08:00' : time)
   const now = new Date()
   const diff = now - date
   const days = Math.floor(diff / (1000 * 60 * 60 * 24))

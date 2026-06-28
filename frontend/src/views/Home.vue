@@ -59,18 +59,27 @@
           </div>
         </div>
         
-        <!-- 标签筛选 -->
+        <!-- 标签筛选（多选） -->
         <div class="mb-6">
-          <h3 class="text-sm font-medium text-gray-700 mb-2">标签</h3>
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-medium text-gray-700">标签（可多选）</h3>
+            <button
+              v-if="filters.tags.length > 0"
+              @click="clearTags"
+              class="text-xs text-primary-600 hover:text-primary-700"
+            >
+              清除全部
+            </button>
+          </div>
           <div class="flex flex-wrap gap-2">
-            <button 
-              v-for="tag in allTags" 
+            <button
+              v-for="tag in allTags"
               :key="tag"
               @click="handleTagClick(tag)"
               :class="[
                 'px-3 py-1 rounded-full text-sm transition-colors',
-                filters.tag === tag 
-                  ? 'bg-blue-600 text-white' 
+                filters.tags.includes(tag)
+                  ? 'bg-blue-600 text-white'
                   : 'bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200'
               ]"
             >
@@ -190,7 +199,7 @@ const filters = reactive({
   page: 1,
   size: 10,
   category: '',
-  tag: '',
+  tags: [],
   keyword: '',
   sortBy: 'time'
 })
@@ -198,7 +207,8 @@ const filters = reactive({
 const categories = ['技术分享', 'AI讨论', '资源推荐', '经验交流', '其他']
 
 const formatTime = (time) => {
-  const date = new Date(time)
+  // 后端返回 Asia/Shanghai 时间，手动加时区偏移避免 JS 按 UTC 解析
+  const date = new Date(time.indexOf('+') === -1 && time.indexOf('Z') === -1 ? time + '+08:00' : time)
   const now = new Date()
   const diff = now - date
   const days = Math.floor(diff / (1000 * 60 * 60 * 24))
@@ -228,7 +238,7 @@ const loadPosts = async (reset = false) => {
       size: filters.size
     }
     if (filters.category) params.category = filters.category
-    if (filters.tag) params.tag = filters.tag
+    if (filters.tags.length > 0) params.tag = filters.tags.join(',')
     if (filters.keyword) params.keyword = filters.keyword
     if (filters.sortBy) params.sortBy = filters.sortBy
     
@@ -258,7 +268,17 @@ const handleCategoryClick = (category) => {
 }
 
 const handleTagClick = (tag) => {
-  filters.tag = filters.tag === tag ? '' : tag
+  const idx = filters.tags.indexOf(tag)
+  if (idx >= 0) {
+    filters.tags.splice(idx, 1)
+  } else {
+    filters.tags.push(tag)
+  }
+  loadPosts(true)
+}
+
+const clearTags = () => {
+  filters.tags = []
   loadPosts(true)
 }
 

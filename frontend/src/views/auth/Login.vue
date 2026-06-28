@@ -89,8 +89,8 @@ const handleLogin = async () => {
   error.value = ''
   
   try {
-    const token = await login(form)
-    setToken(token)
+    const tokenData = await login(form)
+    setToken(tokenData.accessToken)
     
     // 获取用户信息
     const userInfo = await getUserInfo()

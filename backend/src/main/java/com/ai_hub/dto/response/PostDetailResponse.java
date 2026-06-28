@@ -22,6 +22,7 @@ public class PostDetailResponse {
     private List<String> tags;
     private Integer viewCount;
     private Integer likeCount;
+    private Integer collectCount;
     private Integer commentCount;
     private Boolean isLiked;
     private Boolean isCollected;

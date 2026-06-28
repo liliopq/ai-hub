@@ -14,7 +14,7 @@ RUN mkdir -p /root/.m2 && echo '<?xml version="1.0" encoding="UTF-8"?>\
   <mirrors>\
     <mirror>\
       <id>aliyunmaven</id>\
-      <mirrorOf>*</mirrorOf>\
+      <mirrorOf>central</mirrorOf>\
       <name>Aliyun Maven</name>\
       <url>https://maven.aliyun.com/repository/public</url>\
     </mirror>\
@@ -49,20 +49,13 @@ EXPOSE 8080
 # JVM 参数优化（适配容器环境）
 ENV JAVA_OPTS="-Xms256m -Xmx512m -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
 
+# 复制启动脚本
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
+
 # 健康检查：每 30s 检查一次，连续 3 次失败则标记为 unhealthy
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8080/api/auth/health || exit 1
 
 # 启动命令：通过环境变量覆盖配置
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar \
-    --spring.datasource.url=jdbc:mysql://${DB_HOST:-mysql}:${DB_PORT:-3306}/${DB_NAME:-ai_hub}?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8&allowPublicKeyRetrieval=true \
-    --spring.datasource.username=${DB_USERNAME:-root} \
-    --spring.datasource.password=${DB_PASSWORD:-Root@123456} \
-    --spring.data.redis.host=${REDIS_HOST:-redis} \
-    --spring.data.redis.port=${REDIS_PORT:-6379} \
-    --spring.data.redis.password=${REDIS_PASSWORD:-} \
-    --spring.rabbitmq.host=${RABBITMQ_HOST:-rabbitmq} \
-    --spring.rabbitmq.port=${RABBITMQ_PORT:-5672} \
-    --spring.rabbitmq.username=${RABBITMQ_USERNAME:-guest} \
-    --spring.rabbitmq.password=${RABBITMQ_PASSWORD:-guest} \
-    --cors.allowed-origins=${CORS_ORIGINS:-http://localhost}"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

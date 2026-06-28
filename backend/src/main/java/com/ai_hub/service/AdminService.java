@@ -53,14 +53,6 @@ public interface AdminService {
     void updatePostSticky(Long postId, Boolean sticky);
 
     /**
-     * 加精/取消加精帖子
-     *
-     * @param postId 帖子ID
-     * @param essence 是否加精 (true:加精, false:取消加精)
-     */
-    void updatePostEssence(Long postId, Boolean essence);
-
-    /**
      * 删除任何评论
      *
      * @param commentId 评论ID

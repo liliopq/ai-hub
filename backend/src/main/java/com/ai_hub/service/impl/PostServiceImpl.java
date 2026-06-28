@@ -21,9 +21,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.CachePut;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -80,7 +77,13 @@ public class PostServiceImpl implements PostService {
             post.setCommentCount(0);  // 默认评论数为0
             post.setIsSticky(0);  // 默认不置顶
             post.setIsEssence(0); // 默认非精华
-            post.setStatus(1);    // 默认状态为正常
+            // 管理员发帖自动通过，普通用户需审核
+            User currentUser = userMapper.selectById(userId);
+            if (currentUser != null && "ADMIN".equals(currentUser.getRole())) {
+                post.setStatus(1); // 管理员直接发布
+            } else {
+                post.setStatus(0); // 普通用户待审核
+            }
 
             // 2. 保存帖子（createTime 和 updateTime 会自动填充）
             postMapper.insert(post);
@@ -124,9 +127,23 @@ public class PostServiceImpl implements PostService {
             queryWrapper.eq(Post::getCategory, request.getCategory());
         }
         
-        // 标签筛选（标签以逗号分隔存储，使用 LIKE 查询）
+        // 多标签筛选（前端传逗号分隔的标签，后端用 OR LIKE 匹配任一标签）
         if (StringUtils.hasText(request.getTag())) {
-            queryWrapper.like(Post::getTags, request.getTag());
+            String[] tags = request.getTag().split(",");
+            queryWrapper.and(w -> {
+                boolean first = true;
+                for (String t : tags) {
+                    String trimmed = t.trim();
+                    if (!trimmed.isEmpty()) {
+                        if (first) {
+                            w.like(Post::getTags, trimmed);
+                            first = false;
+                        } else {
+                            w.or().like(Post::getTags, trimmed);
+                        }
+                    }
+                }
+            });
         }
         
         // 搜索关键词（使用 MySQL 全文索引 MATCH...AGAINST，比 LIKE 性能高 10-100 倍）
@@ -295,7 +312,7 @@ public class PostServiceImpl implements PostService {
      * @return 帖子详情
      */
     @Override
-    @Cacheable(value = "postDetail", key = "#postId", unless = "#result == null")
+    // 注意：帖子详情包含用户个性化数据（isLiked/isCollected），不适合用缓存
     public PostDetailResponse getPostDetail(Long postId, Long currentUserId) {
         log.info("获取帖子详情，帖子ID: {}, 当前用户ID: {}", postId, currentUserId);
 
@@ -305,9 +322,18 @@ public class PostServiceImpl implements PostService {
             throw new RuntimeException(ErrorCode.POST_NOT_FOUND.getMessage());
         }
 
-        // 2. 检查帖子状态是否正常
+        // 2. 检查帖子查看权限
+        // status: 1=正常(所有人可见), 0=待审核(作者和admin可见), 2=删除(不可见)
         if (post.getStatus() != 1) {
-            throw new RuntimeException(ErrorCode.POST_NOT_FOUND.getMessage());
+            boolean isAuthor = currentUserId != null && currentUserId.equals(post.getUserId());
+            boolean isAdmin = false;
+            if (currentUserId != null) {
+                User currentUser = userMapper.selectById(currentUserId);
+                isAdmin = currentUser != null && "ADMIN".equals(currentUser.getRole());
+            }
+            if (!isAuthor && !isAdmin) {
+                throw new RuntimeException(ErrorCode.POST_NOT_FOUND.getMessage());
+            }
         }
 
         // 3. 增加浏览次数（异步更新，避免影响响应速度）
@@ -321,6 +347,7 @@ public class PostServiceImpl implements PostService {
         response.setCategory(post.getCategory());
         response.setViewCount(post.getViewCount());
         response.setLikeCount(post.getLikeCount());
+        response.setCollectCount(post.getCollectCount());
         response.setCommentCount(post.getCommentCount());
         response.setCreateTime(post.getCreateTime());
         response.setUpdateTime(post.getUpdateTime());
@@ -389,7 +416,6 @@ public class PostServiceImpl implements PostService {
      * @return 更新后的帖子详情
      */
     @Override
-    @CacheEvict(value = "postDetail", key = "#postId")
     public PostDetailResponse updatePost(Long postId, Long userId, String userRole, UpdatePostRequest request) {
         log.info("更新帖子，帖子ID: {}, 用户ID: {}, 角色: {}", postId, userId, userRole);
 
@@ -438,7 +464,6 @@ public class PostServiceImpl implements PostService {
      * @param userRole 当前用户角色
      */
     @Override
-    @CacheEvict(value = "postDetail", key = "#postId")
     public void deletePost(Long postId, Long userId, String userRole) {
         log.info("========== 删除帖子开始 ==========");
         log.info("帖子ID: {}, 操作用户ID: {}, 角色: {}, 时间: {}", postId, userId, userRole, java.time.LocalDateTime.now());

@@ -76,7 +76,7 @@
               ]"
             >
               <Bookmark :class="['w-5 h-5', post.isCollected ? 'fill-current' : '']" />
-              <span>{{ post.isCollected ? '已收藏' : '收藏' }}</span>
+              <span>{{ post.isCollected ? '已收藏' : '收藏' }} {{ post.collectCount || '' }}</span>
             </button>
             <div class="flex items-center space-x-2 text-gray-600">
               <Eye class="w-5 h-5" />
@@ -287,7 +287,9 @@ const canDeleteComment = (comment) => {
 }
 
 const formatTime = (time) => {
-  const date = new Date(time)
+  // 后端返回的是 Asia/Shanghai 时间，但 JavaScript 默认按 UTC 解析
+  // 手动追加 +08:00 时区偏移确保正确
+  const date = new Date(time.indexOf('+') === -1 && time.indexOf('Z') === -1 ? time + '+08:00' : time)
   const now = new Date()
   const diff = now - date
   const days = Math.floor(diff / (1000 * 60 * 60 * 24))
@@ -347,10 +349,7 @@ const handleCollect = async () => {
     const action = post.value.isCollected ? 'uncollect' : 'collect'
     const data = await collectPost(postId, action)
     post.value.isCollected = data.isCollected
-    // 如果有收藏数，也更新
-    if (data.collectCount !== undefined) {
-      // 可以在这里添加收藏数的显示
-    }
+    post.value.collectCount = data.collectCount
   } catch (e) {
     console.error('收藏失败:', e)
     alert(e.message || '操作失败')

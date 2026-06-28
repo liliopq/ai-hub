@@ -11,37 +11,34 @@
           />
           <div class="flex-1 text-center md:text-left">
             <h1 class="text-2xl font-bold text-gray-900">{{ user?.username }}</h1>
-            <p class="text-gray-500 mt-2">
-              注册于 {{ formatDate(user?.createTime) }}
-            </p>
             <p class="text-gray-600 mt-2">
               <span class="inline-block px-2 py-1 bg-gray-100 rounded text-sm">
                 {{ user?.role === 'ADMIN' ? '管理员' : user?.role === 'CREATOR' ? '创作者' : '普通用户' }}
               </span>
             </p>
           </div>
-          <div class="mt-4 md:mt-0 text-center md:text-right">
+          <div class="mt-4 md:mt-0 text-center">
             <div class="flex space-x-6 mb-4">
-              <div>
+              <div class="text-center w-16">
                 <p class="text-2xl font-bold text-gray-900">{{ userPosts.total }}</p>
-                <p class="text-sm text-gray-500">帖子</p>
+                <p class="text-xs text-gray-500">帖子</p>
               </div>
-              <div>
+              <button @click="showFollowList('following')" class="text-center w-16 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer">
                 <p class="text-2xl font-bold text-gray-900">{{ followStats.followingCount }}</p>
-                <p class="text-sm text-gray-500">关注</p>
-              </div>
-              <div>
+                <p class="text-xs text-gray-500">关注</p>
+              </button>
+              <button @click="showFollowList('followers')" class="text-center w-16 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer">
                 <p class="text-2xl font-bold text-gray-900">{{ followStats.followerCount }}</p>
-                <p class="text-sm text-gray-500">粉丝</p>
-              </div>
+                <p class="text-xs text-gray-500">粉丝</p>
+              </button>
             </div>
-            <button 
+            <button
               v-if="isLoggedIn && !isOwnProfile"
               @click="toggleFollow"
               :class="[
                 'px-6 py-2 rounded-lg font-medium transition-colors',
-                isFollowing 
-                  ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' 
+                isFollowing
+                  ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   : 'bg-primary-600 text-white hover:bg-primary-700'
               ]"
               :disabled="followLoading"
@@ -119,19 +116,61 @@
         </nav>
       </div>
     </div>
+
+    <!-- 关注/粉丝列表弹窗 -->
+    <div v-if="followListModal" class="fixed inset-0 z-50 overflow-y-auto" @click.self="followListModal = false">
+      <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-black bg-opacity-40 transition-opacity"></div>
+        <div class="relative bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">
+              {{ followListType === 'following' ? (isOwnProfile ? '我的关注' : 'TA的关注') : (isOwnProfile ? '我的粉丝' : 'TA的粉丝') }}
+            </h3>
+            <button @click="followListModal = false" class="text-gray-400 hover:text-gray-600">
+              <X class="w-5 h-5" />
+            </button>
+          </div>
+          <div v-if="followListLoading" class="text-center py-8">
+            <Loader2 class="w-6 h-6 text-primary-600 animate-spin mx-auto" />
+          </div>
+          <div v-else-if="followList.length === 0" class="text-center py-8 text-gray-500">
+            {{ followListType === 'following' ? '还没有关注任何人' : '还没有粉丝' }}
+          </div>
+          <div v-else class="space-y-3 max-h-96 overflow-y-auto">
+            <div
+              v-for="item in followList"
+              :key="item.id"
+              class="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer"
+              @click="goToUser(item.id)"
+            >
+              <img :src="item.avatar || defaultAvatar" :alt="item.username" class="w-10 h-10 rounded-full object-cover" />
+              <div class="flex-1">
+                <p class="text-sm font-medium text-gray-900">{{ item.username }}</p>
+                <p class="text-xs text-gray-400">
+                  <span class="inline-block px-1.5 py-0.5 bg-gray-100 rounded text-xs">
+                    {{ item.role === 'ADMIN' ? '管理员' : '普通用户' }}
+                  </span>
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
-import { FileText } from 'lucide-vue-next'
+import { useRoute, useRouter } from 'vue-router'
+import { FileText, X, Loader2 } from 'lucide-vue-next'
 import { getUserById } from '../../api/user'
 import { getUserPosts } from '../../api/post'
-import { followUser, unfollowUser, checkFollowing, getFollowCounts } from '../../api/follow'
+import { followUser, unfollowUser, checkFollowing, getFollowCounts, getFollowingList, getFollowerList } from '../../api/follow'
 import { getUser } from '../../utils/auth'
 
 const route = useRoute()
+const router = useRouter()
 const userId = ref(Number(route.params.userId))
 const user = ref(null)
 const userPosts = ref({ records: [], total: 0, size: 10, current: 1 })
@@ -148,13 +187,20 @@ const isOwnProfile = computed(() => {
   return currentUser && currentUser.id === userId.value
 })
 
+// 关注/粉丝列表弹窗
+const followListModal = ref(false)
+const followListType = ref('following')
+const followList = ref([])
+const followListLoading = ref(false)
+
 const totalPages = computed(() => {
   return Math.ceil(userPosts.value.total / userPosts.value.size)
 })
 
 const formatDate = (dateStr) => {
   if (!dateStr) return ''
-  const date = new Date(dateStr)
+  // 后端返回 Asia/Shanghai 时间，手动加时区偏移
+  const date = new Date(dateStr.indexOf('+') === -1 && dateStr.indexOf('Z') === -1 ? dateStr + '+08:00' : dateStr)
   return date.toLocaleDateString('zh-CN', {
     year: 'numeric',
     month: 'long',
@@ -163,7 +209,29 @@ const formatDate = (dateStr) => {
 }
 
 const goToPost = (postId) => {
-  window.location.href = `/post/${postId}`
+  router.push(`/post/${postId}`)
+}
+
+const showFollowList = async (type) => {
+  followListType.value = type
+  followListModal.value = true
+  followListLoading.value = true
+  followList.value = []
+  try {
+    const data = type === 'following'
+      ? await getFollowingList(userId.value)
+      : await getFollowerList(userId.value)
+    followList.value = data
+  } catch (e) {
+    console.error('获取列表失败:', e)
+  } finally {
+    followListLoading.value = false
+  }
+}
+
+const goToUser = (uid) => {
+  followListModal.value = false
+  router.push(`/user/${uid}`)
 }
 
 const fetchUserInfo = async () => {

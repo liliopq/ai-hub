@@ -72,11 +72,6 @@ public class AdminPostResponse {
     private Integer isSticky;
     
     /**
-     * 是否精华 (0:否, 1:是)
-     */
-    private Integer isEssence;
-    
-    /**
      * 状态 (1:正常, 0:审核中, 2:已删除)
      */
     private Integer status;
@@ -95,4 +90,22 @@ public class AdminPostResponse {
      * 逻辑删除标记 (0:未删除, 1:已删除)
      */
     private Integer deleted;
+
+    /**
+     * 发帖用户信息
+     */
+    private UserBasicInfo user;
+
+    /**
+     * 用户基本信息内部类
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class UserBasicInfo {
+        private Long id;
+        private String username;
+        private String avatar;
+    }
 }
