@@ -25,6 +25,9 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
+
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -312,7 +315,7 @@ public class PostServiceImpl implements PostService {
      * @return 帖子详情
      */
     @Override
-    // 注意：帖子详情包含用户个性化数据（isLiked/isCollected），不适合用缓存
+    @Cacheable(value = "postDetail", key = "#postId", unless = "#result == null")
     public PostDetailResponse getPostDetail(Long postId, Long currentUserId) {
         log.info("获取帖子详情，帖子ID: {}, 当前用户ID: {}", postId, currentUserId);
 
@@ -416,6 +419,7 @@ public class PostServiceImpl implements PostService {
      * @return 更新后的帖子详情
      */
     @Override
+    @CacheEvict(value = "postDetail", key = "#postId")
     public PostDetailResponse updatePost(Long postId, Long userId, String userRole, UpdatePostRequest request) {
         log.info("更新帖子，帖子ID: {}, 用户ID: {}, 角色: {}", postId, userId, userRole);
 
@@ -464,6 +468,7 @@ public class PostServiceImpl implements PostService {
      * @param userRole 当前用户角色
      */
     @Override
+    @CacheEvict(value = "postDetail", key = "#postId")
     public void deletePost(Long postId, Long userId, String userRole) {
         log.info("========== 删除帖子开始 ==========");
         log.info("帖子ID: {}, 操作用户ID: {}, 角色: {}, 时间: {}", postId, userId, userRole, java.time.LocalDateTime.now());
