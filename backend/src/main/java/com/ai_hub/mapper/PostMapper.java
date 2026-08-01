@@ -22,6 +22,30 @@ public interface PostMapper extends BaseMapper<Post> {
     int incrementViewCount(Long postId);
 
     /**
+     * 原子增加帖子点赞数
+     */
+    @Update("UPDATE post SET like_count = like_count + 1 WHERE id = #{postId}")
+    int incrementLikeCount(Long postId);
+
+    /**
+     * 原子减少帖子点赞数（确保不小于0）
+     */
+    @Update("UPDATE post SET like_count = GREATEST(like_count - 1, 0) WHERE id = #{postId}")
+    int decrementLikeCount(Long postId);
+
+    /**
+     * 原子增加帖子收藏数
+     */
+    @Update("UPDATE post SET collect_count = COALESCE(collect_count, 0) + 1 WHERE id = #{postId}")
+    int incrementCollectCount(Long postId);
+
+    /**
+     * 原子减少帖子收藏数（确保不小于0）
+     */
+    @Update("UPDATE post SET collect_count = GREATEST(COALESCE(collect_count, 0) - 1, 0) WHERE id = #{postId}")
+    int decrementCollectCount(Long postId);
+
+    /**
      * 使用 MySQL 全文索引搜索帖子（布尔模式）
      * MATCH...AGAINST 比 LIKE '%keyword%' 性能高 10-100 倍
      * IN BOOLEAN MODE 支持 +必须包含 -排除 ~降低权重 等操作符

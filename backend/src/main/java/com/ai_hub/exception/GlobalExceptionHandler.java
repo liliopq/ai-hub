@@ -2,6 +2,7 @@ package com.ai_hub.exception;
 
 import com.ai_hub.dto.response.Result;
 import com.ai_hub.enums.ErrorCode;
+import com.ai_hub.exception.BusinessException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.BindException;
@@ -23,13 +24,25 @@ import java.util.Map;
 public class GlobalExceptionHandler {
 
     /**
-     * 处理业务异常（RuntimeException）
+     * 处理业务异常（BusinessException）
+     * 业务异常携带 ErrorCode，返回正确的业务错误码给前端
+     */
+    @ExceptionHandler(BusinessException.class)
+    @ResponseStatus(HttpStatus.OK)
+    public Result<Void> handleBusinessException(BusinessException e) {
+        log.warn("业务异常: code={}, message={}", e.getErrorCode().getCode(), e.getMessage());
+        return Result.error(e.getErrorCode(), e.getMessage());
+    }
+
+    /**
+     * 处理未预期的运行时异常（RuntimeException）
+     * 这类异常不携带业务错误码，统一返回 500
      */
     @ExceptionHandler(RuntimeException.class)
     @ResponseStatus(HttpStatus.OK)
     public Result<Void> handleRuntimeException(RuntimeException e) {
-        log.error("业务异常: {}", e.getMessage(), e);
-        return Result.error(ErrorCode.INTERNAL_SERVER_ERROR, e.getMessage());
+        log.error("系统运行时异常: {}", e.getMessage(), e);
+        return Result.error(ErrorCode.INTERNAL_SERVER_ERROR, "服务器内部错误");
     }
 
     /**

@@ -1,6 +1,8 @@
 package com.ai_hub.service.impl;
 
 import com.ai_hub.config.OssConfig;
+import com.ai_hub.enums.ErrorCode;
+import com.ai_hub.exception.BusinessException;
 import com.ai_hub.service.FileUploadService;
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.model.ObjectMetadata;
@@ -80,7 +82,7 @@ public class FileUploadServiceImpl implements FileUploadService {
             
         } catch (IOException e) {
             log.error("头像上传到OSS失败", e);
-            throw new RuntimeException("文件上传失败");
+            throw new BusinessException(ErrorCode.FILE_UPLOAD_ERROR, "文件上传失败");
         }
     }
     
@@ -107,7 +109,7 @@ public class FileUploadServiceImpl implements FileUploadService {
             
         } catch (IOException e) {
             log.error("头像上传到本地失败", e);
-            throw new RuntimeException("文件上传失败");
+            throw new BusinessException(ErrorCode.FILE_UPLOAD_ERROR, "文件上传失败");
         }
     }
     
@@ -166,19 +168,19 @@ public class FileUploadServiceImpl implements FileUploadService {
     private void validateFile(MultipartFile file) {
         // 检查文件是否为空
         if (file == null || file.isEmpty()) {
-            throw new RuntimeException("文件不能为空");
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "文件不能为空");
         }
         
         // 检查文件大小（限制为5MB）
         long maxSize = 5 * 1024 * 1024;
         if (file.getSize() > maxSize) {
-            throw new RuntimeException("文件大小不能超过5MB");
+            throw new BusinessException(ErrorCode.FILE_SIZE_EXCEEDED, "文件大小不能超过5MB");
         }
         
         // 检查文件类型
         String contentType = file.getContentType();
         if (contentType == null || !contentType.startsWith("image/")) {
-            throw new RuntimeException("只支持图片格式");
+            throw new BusinessException(ErrorCode.FILE_TYPE_NOT_ALLOWED, "只支持图片格式");
         }
         
         // 检查文件扩展名
@@ -186,7 +188,7 @@ public class FileUploadServiceImpl implements FileUploadService {
         if (originalFilename != null) {
             String extension = originalFilename.substring(originalFilename.lastIndexOf(".") + 1).toLowerCase();
             if (!isValidImageExtension(extension)) {
-                throw new RuntimeException("不支持的图片格式");
+                throw new BusinessException(ErrorCode.FILE_TYPE_NOT_ALLOWED, "不支持的图片格式");
             }
         }
     }

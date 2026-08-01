@@ -8,6 +8,7 @@ import com.ai_hub.dto.response.RegisterResponse;
 import com.ai_hub.dto.response.UserResponse;
 import com.ai_hub.entity.User;
 import com.ai_hub.enums.ErrorCode;
+import com.ai_hub.exception.BusinessException;
 import com.ai_hub.mapper.UserMapper;
 import com.ai_hub.service.FileUploadService;
 import com.ai_hub.service.UserService;
@@ -51,7 +52,7 @@ public class UserServiceImpl implements UserService {
         queryWrapper.eq(User::getUsername, request.getUsername());
         User existingUser = userMapper.selectOne(queryWrapper);
         if (existingUser != null) {
-            throw new RuntimeException(ErrorCode.USER_ALREADY_EXISTS.getMessage());
+            throw new BusinessException(ErrorCode.USER_ALREADY_EXISTS);
         }
 
         // 2. 创建新用户
@@ -97,17 +98,17 @@ public class UserServiceImpl implements UserService {
 
         // 2. 检查用户是否存在
         if (user == null) {
-            throw new RuntimeException(ErrorCode.USER_NOT_FOUND.getMessage());
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }
 
         // 3. 检查用户状态是否正常
         if (user.getStatus() == 0) {
-            throw new RuntimeException(ErrorCode.ACCOUNT_DISABLED.getMessage());
+            throw new BusinessException(ErrorCode.ACCOUNT_DISABLED);
         }
 
         // 4. 验证密码
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new RuntimeException(ErrorCode.USERNAME_OR_PASSWORD_ERROR.getMessage());
+            throw new BusinessException(ErrorCode.USERNAME_OR_PASSWORD_ERROR);
         }
 
         // 5. 生成 Access Token 和 Refresh Token（嵌入当前 tokenVersion）
@@ -169,12 +170,12 @@ public class UserServiceImpl implements UserService {
         // 1. 查询用户
         User user = userMapper.selectById(userId);
         if (user == null) {
-            throw new RuntimeException(ErrorCode.USER_NOT_FOUND.getMessage());
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }
 
         // 2. 检查用户状态是否正常
         if (user.getStatus() == 0) {
-            throw new RuntimeException(ErrorCode.ACCOUNT_DISABLED.getMessage());
+            throw new BusinessException(ErrorCode.ACCOUNT_DISABLED);
         }
 
         // 3. 构建响应
@@ -205,12 +206,12 @@ public class UserServiceImpl implements UserService {
         // 1. 查询用户
         User user = userMapper.selectById(userId);
         if (user == null) {
-            throw new RuntimeException(ErrorCode.USER_NOT_FOUND.getMessage());
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }
 
         // 2. 检查用户状态是否正常
         if (user.getStatus() == 0) {
-            throw new RuntimeException(ErrorCode.ACCOUNT_DISABLED.getMessage());
+            throw new BusinessException(ErrorCode.ACCOUNT_DISABLED);
         }
 
         // 3. 部分更新用户信息（只更新非空字段）
@@ -221,7 +222,7 @@ public class UserServiceImpl implements UserService {
                     .ne(User::getId, userId);
             User existingUser = userMapper.selectOne(queryWrapper);
             if (existingUser != null) {
-                throw new RuntimeException(ErrorCode.USER_ALREADY_EXISTS.getMessage());
+                throw new BusinessException(ErrorCode.USER_ALREADY_EXISTS);
             }
             user.setUsername(request.getUsername());
         }
@@ -274,22 +275,22 @@ public class UserServiceImpl implements UserService {
         // 1. 查询用户
         User user = userMapper.selectById(userId);
         if (user == null) {
-            throw new RuntimeException(ErrorCode.USER_NOT_FOUND.getMessage());
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }
 
         // 2. 检查用户状态是否正常
         if (user.getStatus() == 0) {
-            throw new RuntimeException(ErrorCode.ACCOUNT_DISABLED.getMessage());
+            throw new BusinessException(ErrorCode.ACCOUNT_DISABLED);
         }
 
         // 3. 验证原密码是否正确
         if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
-            throw new RuntimeException(ErrorCode.OLD_PASSWORD_ERROR.getMessage());
+            throw new BusinessException(ErrorCode.OLD_PASSWORD_ERROR);
         }
 
         // 4. 检查新密码是否与原密码相同
         if (request.getOldPassword().equals(request.getNewPassword())) {
-            throw new RuntimeException("新密码不能与原密码相同");
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "新密码不能与原密码相同");
         }
 
         // 5. 加密并更新新密码（updateTime 会自动填充）
@@ -315,12 +316,12 @@ public class UserServiceImpl implements UserService {
         // 1. 查询用户
         User user = userMapper.selectById(userId);
         if (user == null) {
-            throw new RuntimeException(ErrorCode.USER_NOT_FOUND.getMessage());
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }
 
         // 2. 检查用户状态是否正常
         if (user.getStatus() == 0) {
-            throw new RuntimeException(ErrorCode.ACCOUNT_DISABLED.getMessage());
+            throw new BusinessException(ErrorCode.ACCOUNT_DISABLED);
         }
 
         // 3. 构建响应（只返回公开信息）

@@ -1,5 +1,7 @@
 package com.ai_hub.service.impl;
 
+import com.ai_hub.exception.BusinessException;
+import com.ai_hub.enums.ErrorCode;
 import com.ai_hub.dto.request.NotificationListRequest;
 import com.ai_hub.dto.response.NotificationResponse;
 import com.ai_hub.dto.response.PageResult;
@@ -119,7 +121,7 @@ public class NotificationServiceImpl implements NotificationService {
         
         Notification notification = notificationMapper.selectOne(queryWrapper);
         if (notification == null) {
-            throw new RuntimeException("通知不存在或无权操作");
+            throw new BusinessException(ErrorCode.NOT_FOUND, "通知不存在或无权操作");
         }
 
         // 2. 如果已经是已读状态，直接返回

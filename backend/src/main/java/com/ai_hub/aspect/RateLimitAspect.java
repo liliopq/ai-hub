@@ -1,6 +1,8 @@
 package com.ai_hub.aspect;
 
 import com.ai_hub.annotation.RateLimit;
+import com.ai_hub.enums.ErrorCode;
+import com.ai_hub.exception.BusinessException;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -102,7 +104,7 @@ public class RateLimitAspect {
         if (currentCount != null && currentCount > maxRequests) {
             log.warn("限流触发 - IP: {}, 接口: {}.{}, 当前请求数: {}, 最大允许: {}", 
                     ip, className, methodName, currentCount, maxRequests);
-            throw new RuntimeException(message);
+            throw new BusinessException(ErrorCode.TOO_MANY_REQUESTS, message);
         }
 
         // 设置过期时间（避免内存泄漏）

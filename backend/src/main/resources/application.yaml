@@ -34,7 +34,7 @@ spring:
     # - useUnicode=true：启用Unicode字符支持
     # - allowPublicKeyRetrieval=true：允许公钥检索（MySQL 8.0+需要）
     # - serverTimezone：指定MySQL服务器的时区
-    url: jdbc:mysql://localhost:3306/ai_hub?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8
+    url: jdbc:mysql://localhost:3306/ai_hub?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8mb4
 
     # 数据库用户名
     # 使用 ${DB_USERNAME:root} 表示：

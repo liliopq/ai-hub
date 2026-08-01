@@ -4,6 +4,7 @@ import com.ai_hub.dto.response.UserResponse;
 import com.ai_hub.entity.User;
 import com.ai_hub.entity.UserFollow;
 import com.ai_hub.enums.ErrorCode;
+import com.ai_hub.exception.BusinessException;
 import com.ai_hub.mapper.UserFollowMapper;
 import com.ai_hub.mapper.UserMapper;
 import com.ai_hub.service.FollowService;
@@ -34,19 +35,19 @@ public class FollowServiceImpl implements FollowService {
 
         // 1. 检查是否是关注自己
         if (followerId.equals(followeeId)) {
-            throw new RuntimeException("不能关注自己");
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "不能关注自己");
         }
 
         // 2. 检查被关注者是否存在
         User followee = userMapper.selectById(followeeId);
         if (followee == null) {
-            throw new RuntimeException(ErrorCode.USER_NOT_FOUND.getMessage());
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }
 
         // 3. 检查是否已经关注
         Long count = userFollowMapper.checkFollow(followerId, followeeId);
         if (count > 0) {
-            throw new RuntimeException("已经关注该用户");
+            throw new BusinessException(ErrorCode.CONFLICT, "已经关注该用户");
         }
 
         // 4. 创建关注记录
@@ -72,7 +73,7 @@ public class FollowServiceImpl implements FollowService {
         
         UserFollow userFollow = userFollowMapper.selectOne(queryWrapper);
         if (userFollow == null) {
-            throw new RuntimeException("未关注该用户");
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "未关注该用户");
         }
 
         // 2. 删除关注记录

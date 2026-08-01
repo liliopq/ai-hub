@@ -1,5 +1,6 @@
 package com.ai_hub.service.impl;
 
+import com.ai_hub.exception.BusinessException;
 import com.ai_hub.dto.request.ChatRequest;
 import com.ai_hub.dto.response.ChatResponse;
 import com.ai_hub.dto.response.MessageItem;
@@ -9,6 +10,7 @@ import com.ai_hub.entity.AiSession;
 import com.ai_hub.mapper.AiMessageMapper;
 import com.ai_hub.mapper.AiSessionMapper;
 import com.ai_hub.service.AiChatService;
+import com.ai_hub.enums.ErrorCode;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -327,7 +329,7 @@ public class AiChatServiceImpl implements AiChatService {
             log.error("调用 AI 模型失败，错误类型: {}, 错误信息: {}",
                     e.getClass().getName(), e.getMessage());
             log.error("详细堆栈信息:", e);
-            throw new RuntimeException("AI 服务暂时不可用，请稍后重试。错误: " + e.getMessage());
+            throw new BusinessException(ErrorCode.SERVICE_UNAVAILABLE, "AI 服务暂时不可用，请稍后重试。错误: " + e.getMessage());
         }
     }
 
@@ -392,7 +394,7 @@ public class AiChatServiceImpl implements AiChatService {
 
         AiSession session = aiSessionMapper.selectOne(queryWrapper);
         if (session == null) {
-            throw new RuntimeException("会话不存在或无权删除");
+            throw new BusinessException(ErrorCode.NOT_FOUND, "会话不存在或无权删除");
         }
 
         // 2. 删除会话关联的消息
@@ -426,7 +428,7 @@ public class AiChatServiceImpl implements AiChatService {
 
         AiSession session = aiSessionMapper.selectOne(sessionQuery);
         if (session == null) {
-            throw new RuntimeException("会话不存在或无权访问");
+            throw new BusinessException(ErrorCode.NOT_FOUND, "会话不存在或无权访问");
         }
 
         // 2. 查询会话的所有消息

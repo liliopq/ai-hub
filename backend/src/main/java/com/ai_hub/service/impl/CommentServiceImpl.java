@@ -11,6 +11,7 @@ import com.ai_hub.entity.CommentLike;
 import com.ai_hub.entity.Post;
 import com.ai_hub.entity.User;
 import com.ai_hub.enums.ErrorCode;
+import com.ai_hub.exception.BusinessException;
 import com.ai_hub.mapper.CommentLikeMapper;
 import com.ai_hub.mapper.CommentMapper;
 import com.ai_hub.mapper.PostMapper;
@@ -59,28 +60,28 @@ public class CommentServiceImpl implements CommentService {
         // 1. 验证帖子是否存在且状态正常
         Post post = postMapper.selectById(request.getPostId());
         if (post == null) {
-            throw new RuntimeException(ErrorCode.POST_NOT_FOUND.getMessage());
+            throw new BusinessException(ErrorCode.POST_NOT_FOUND);
         }
         if (post.getStatus() != 1) {
-            throw new RuntimeException("帖子状态异常，无法评论");
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "帖子状态异常，无法评论");
         }
         
         // 2. 如果是回复评论，验证父评论是否存在
         if (request.getParentId() != null && request.getParentId() != 0) {
             Comment parentComment = commentMapper.selectById(request.getParentId());
             if (parentComment == null) {
-                throw new RuntimeException("父评论不存在");
+                throw new BusinessException(ErrorCode.NOT_FOUND, "父评论不存在");
             }
             // 验证父评论是否属于该帖子
             if (!parentComment.getPostId().equals(request.getPostId())) {
-                throw new RuntimeException("父评论不属于该帖子");
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "父评论不属于该帖子");
             }
         }
         
         // 3. 验证用户是否存在
         User user = userMapper.selectById(userId);
         if (user == null) {
-            throw new RuntimeException(ErrorCode.USER_NOT_FOUND.getMessage());
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }
         
         // 4. 创建评论（进行 XSS 防护）
@@ -142,7 +143,7 @@ public class CommentServiceImpl implements CommentService {
         // 1. 验证帖子是否存在
         Post post = postMapper.selectById(postId);
         if (post == null) {
-            throw new RuntimeException(ErrorCode.POST_NOT_FOUND.getMessage());
+            throw new BusinessException(ErrorCode.POST_NOT_FOUND);
         }
         
         // 2. 分页查询顶层评论（parentId = 0）
@@ -286,12 +287,12 @@ public class CommentServiceImpl implements CommentService {
         // 1. 查询评论
         Comment comment = commentMapper.selectById(commentId);
         if (comment == null) {
-            throw new RuntimeException("评论不存在");
+            throw new BusinessException(ErrorCode.COMMENT_NOT_FOUND);
         }
         
         // 2. 权限验证：只有评论作者或管理员可以删除
         if (!comment.getUserId().equals(userId) && !"ADMIN".equals(userRole)) {
-            throw new RuntimeException("没有权限删除该评论");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "没有权限删除该评论");
         }
         
         // 3. 软删除评论（MyBatis-Plus 的 @TableLogic 会自动处理）
@@ -322,7 +323,7 @@ public class CommentServiceImpl implements CommentService {
         // 1. 验证评论是否存在
         Comment comment = commentMapper.selectById(commentId);
         if (comment == null) {
-            throw new RuntimeException("评论不存在");
+            throw new BusinessException(ErrorCode.COMMENT_NOT_FOUND);
         }
         
         // 获取评论作者ID
@@ -338,15 +339,9 @@ public class CommentServiceImpl implements CommentService {
         if (existingLike != null) {
             // 取消点赞
             commentLikeMapper.deleteById(existingLike.getId());
-            
-            // 更新评论的点赞数（减1）
-            if (comment.getLikeCount() != null && comment.getLikeCount() > 0) {
-                comment.setLikeCount(comment.getLikeCount() - 1);
-            } else {
-                comment.setLikeCount(0);
-            }
-            commentMapper.updateById(comment);
-            
+            // 原子更新评论点赞数（避免并发竞态条件）
+            commentMapper.decrementLikeCount(commentId);
+
             isLiked = false;
             log.info("取消点赞成功，评论ID: {}", commentId);
         } else {
@@ -355,14 +350,12 @@ public class CommentServiceImpl implements CommentService {
             like.setCommentId(commentId);
             like.setUserId(userId);
             commentLikeMapper.insert(like);
-            
-            // 更新评论的点赞数（加1）
-            comment.setLikeCount(comment.getLikeCount() != null ? comment.getLikeCount() + 1 : 1);
-            commentMapper.updateById(comment);
-            
+            // 原子更新评论点赞数（避免并发竞态条件）
+            commentMapper.incrementLikeCount(commentId);
+
             isLiked = true;
             log.info("点赞成功，评论ID: {}", commentId);
-            
+
             // 发送评论点赞通知（排除自己点赞自己的情况）
             if (!userId.equals(commentAuthorId)) {
                 // 获取评论内容用于通知
@@ -373,10 +366,11 @@ public class CommentServiceImpl implements CommentService {
                 webSocketNotificationService.sendCommentLikeNotification(commentAuthorId, userId, commentId, commentContent);
             }
         }
-        
-        // 3. 返回最新的点赞数
+
+        // 3. 查询最新点赞数并返回
+        Comment updatedComment = commentMapper.selectById(commentId);
         CommentLikeResponse response = new CommentLikeResponse();
-        response.setLikeCount(comment.getLikeCount());
+        response.setLikeCount(updatedComment != null ? updatedComment.getLikeCount() : 0);
         
         return response;
     }

@@ -10,6 +10,7 @@ import com.ai_hub.entity.PostCollect;
 import com.ai_hub.entity.PostLike;
 import com.ai_hub.entity.User;
 import com.ai_hub.enums.ErrorCode;
+import com.ai_hub.exception.BusinessException;
 import com.ai_hub.mapper.PostCollectMapper;
 import com.ai_hub.mapper.PostLikeMapper;
 import com.ai_hub.mapper.PostMapper;
@@ -322,7 +323,7 @@ public class PostServiceImpl implements PostService {
         // 1. 查询帖子
         Post post = postMapper.selectById(postId);
         if (post == null) {
-            throw new RuntimeException(ErrorCode.POST_NOT_FOUND.getMessage());
+            throw new BusinessException(ErrorCode.POST_NOT_FOUND);
         }
 
         // 2. 检查帖子查看权限
@@ -335,7 +336,7 @@ public class PostServiceImpl implements PostService {
                 isAdmin = currentUser != null && "ADMIN".equals(currentUser.getRole());
             }
             if (!isAuthor && !isAdmin) {
-                throw new RuntimeException(ErrorCode.POST_NOT_FOUND.getMessage());
+                throw new BusinessException(ErrorCode.POST_NOT_FOUND);
             }
         }
 
@@ -426,12 +427,12 @@ public class PostServiceImpl implements PostService {
         // 1. 查询帖子
         Post post = postMapper.selectById(postId);
         if (post == null) {
-            throw new RuntimeException(ErrorCode.POST_NOT_FOUND.getMessage());
+            throw new BusinessException(ErrorCode.POST_NOT_FOUND);
         }
 
         // 2. 权限验证：只有帖主或管理员可以更新
         if (!post.getUserId().equals(userId) && !"ADMIN".equals(userRole)) {
-            throw new RuntimeException("没有权限更新该帖子");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "没有权限更新该帖子");
         }
 
         // 3. 部分更新（只更新非空字段）
@@ -448,7 +449,10 @@ public class PostServiceImpl implements PostService {
         }
 
         if (request.getTags() != null && request.getTags().length > 0) {
-            post.setTags(String.join(",", request.getTags()));
+            post.setTags(String.join(",",
+                Arrays.stream(request.getTags())
+                      .map(XssUtils::escapeHtml)
+                      .toArray(String[]::new)));
         }
 
         // 4. 保存更新（updateTime 会自动填充）
@@ -477,13 +481,13 @@ public class PostServiceImpl implements PostService {
             Post post = postMapper.selectById(postId);
             if (post == null) {
                 log.error("删除失败：帖子不存在，帖子ID: {}", postId);
-                throw new RuntimeException(ErrorCode.POST_NOT_FOUND.getMessage());
+                throw new BusinessException(ErrorCode.POST_NOT_FOUND);
             }
 
             // 2. 权限验证：只有帖主或管理员可以删除
             if (!post.getUserId().equals(userId) && !"ADMIN".equals(userRole)) {
                 log.error("删除失败：没有权限，帖子ID: {}, 用户ID: {}", postId, userId);
-                throw new RuntimeException("没有权限删除该帖子");
+                throw new BusinessException(ErrorCode.FORBIDDEN, "没有权限删除该帖子");
             }
 
             // 3. 软删除（MyBatis-Plus 的 @TableLogic 会自动处理）
@@ -512,12 +516,12 @@ public class PostServiceImpl implements PostService {
         // 1. 查询帖子
         Post post = postMapper.selectById(postId);
         if (post == null) {
-            throw new RuntimeException(ErrorCode.POST_NOT_FOUND.getMessage());
+            throw new BusinessException(ErrorCode.POST_NOT_FOUND);
         }
 
         // 2. 检查帖子状态是否正常
         if (post.getStatus() != 1) {
-            throw new RuntimeException(ErrorCode.POST_NOT_FOUND.getMessage());
+            throw new BusinessException(ErrorCode.POST_NOT_FOUND);
         }
 
         // 3. 根据操作类型执行点赞或取消点赞
@@ -528,7 +532,7 @@ public class PostServiceImpl implements PostService {
             // 取消点赞
             return unlikePost(postId, userId, post);
         } else {
-            throw new RuntimeException("无效的操作类型");
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "无效的操作类型");
         }
     }
 
@@ -543,7 +547,7 @@ public class PostServiceImpl implements PostService {
         Long count = postLikeMapper.selectCount(queryWrapper);
 
         if (count > 0) {
-            throw new RuntimeException(ErrorCode.POST_ALREADY_LIKED.getMessage());
+            throw new BusinessException(ErrorCode.POST_ALREADY_LIKED);
         }
 
         // 创建点赞记录
@@ -552,9 +556,8 @@ public class PostServiceImpl implements PostService {
         postLike.setUserId(userId);
         postLikeMapper.insert(postLike);
 
-        // 更新帖子点赞数
-        post.setLikeCount(post.getLikeCount() + 1);
-        postMapper.updateById(post);
+        // 原子更新帖子点赞数（避免并发竞态条件）
+        postMapper.incrementLikeCount(postId);
 
         log.info("点赞成功，帖子ID: {}, 用户ID: {}", postId, userId);
 
@@ -567,7 +570,9 @@ public class PostServiceImpl implements PostService {
             webSocketNotificationService.sendLikeNotification(post.getUserId(), userId, postId);
         }
 
-        return new LikeResponse(post.getLikeCount(), true);
+        // 查询最新的点赞数
+        Post updatedPost = postMapper.selectById(postId);
+        return new LikeResponse(updatedPost.getLikeCount(), true);
     }
 
     /**
@@ -581,19 +586,20 @@ public class PostServiceImpl implements PostService {
         PostLike postLike = postLikeMapper.selectOne(queryWrapper);
 
         if (postLike == null) {
-            throw new RuntimeException(ErrorCode.POST_NOT_LIKED.getMessage());
+            throw new BusinessException(ErrorCode.POST_NOT_LIKED);
         }
 
         // 删除点赞记录
         postLikeMapper.deleteById(postLike.getId());
 
-        // 更新帖子点赞数
-        post.setLikeCount(post.getLikeCount() - 1);
-        postMapper.updateById(post);
+        // 原子更新帖子点赞数（避免并发竞态条件）
+        postMapper.decrementLikeCount(postId);
 
         log.info("取消点赞成功，帖子ID: {}, 用户ID: {}", postId, userId);
 
-        return new LikeResponse(post.getLikeCount(), false);
+        // 查询最新的点赞数
+        Post updatedPost = postMapper.selectById(postId);
+        return new LikeResponse(updatedPost.getLikeCount(), false);
     }
 
     /**
@@ -611,12 +617,12 @@ public class PostServiceImpl implements PostService {
         // 1. 查询帖子
         Post post = postMapper.selectById(postId);
         if (post == null) {
-            throw new RuntimeException(ErrorCode.POST_NOT_FOUND.getMessage());
+            throw new BusinessException(ErrorCode.POST_NOT_FOUND);
         }
 
         // 2. 检查帖子状态是否正常
         if (post.getStatus() != 1) {
-            throw new RuntimeException(ErrorCode.POST_NOT_FOUND.getMessage());
+            throw new BusinessException(ErrorCode.POST_NOT_FOUND);
         }
 
         // 3. 根据操作类型执行收藏或取消收藏
@@ -627,7 +633,7 @@ public class PostServiceImpl implements PostService {
             // 取消收藏
             return uncollectPost(postId, userId, post);
         } else {
-            throw new RuntimeException("无效的操作类型");
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "无效的操作类型");
         }
     }
 
@@ -642,7 +648,7 @@ public class PostServiceImpl implements PostService {
         Long count = postCollectMapper.selectCount(queryWrapper);
 
         if (count > 0) {
-            throw new RuntimeException("已经收藏过了");
+            throw new BusinessException(ErrorCode.CONFLICT, "已经收藏过了");
         }
 
         // 创建收藏记录
@@ -651,14 +657,8 @@ public class PostServiceImpl implements PostService {
         postCollect.setUserId(userId);
         postCollectMapper.insert(postCollect);
 
-        // 初始化收藏数（如果为null）
-        if (post.getCollectCount() == null) {
-            post.setCollectCount(0);
-        }
-        
-        // 更新帖子收藏数
-        post.setCollectCount(post.getCollectCount() + 1);
-        postMapper.updateById(post);
+        // 原子更新帖子收藏数（避免并发竞态条件）
+        postMapper.incrementCollectCount(postId);
 
         log.info("收藏成功，帖子ID: {}, 用户ID: {}", postId, userId);
 
@@ -667,7 +667,9 @@ public class PostServiceImpl implements PostService {
             webSocketNotificationService.sendCollectNotification(post.getUserId(), userId, postId);
         }
 
-        return new CollectResponse(post.getCollectCount(), true);
+        // 查询最新的收藏数
+        Post updatedPost = postMapper.selectById(postId);
+        return new CollectResponse(updatedPost.getCollectCount(), true);
     }
 
     /**
@@ -681,24 +683,20 @@ public class PostServiceImpl implements PostService {
         PostCollect postCollect = postCollectMapper.selectOne(queryWrapper);
 
         if (postCollect == null) {
-            throw new RuntimeException("还未收藏");
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "还未收藏");
         }
 
         // 删除收藏记录
         postCollectMapper.deleteById(postCollect.getId());
 
-        // 初始化收藏数（如果为null）
-        if (post.getCollectCount() == null) {
-            post.setCollectCount(0);
-        }
-        
-        // 更新帖子收藏数
-        post.setCollectCount(post.getCollectCount() - 1);
-        postMapper.updateById(post);
+        // 原子更新帖子收藏数（避免并发竞态条件）
+        postMapper.decrementCollectCount(postId);
 
         log.info("取消收藏成功，帖子ID: {}, 用户ID: {}", postId, userId);
 
-        return new CollectResponse(post.getCollectCount(), false);
+        // 查询最新的收藏数
+        Post updatedPost = postMapper.selectById(postId);
+        return new CollectResponse(updatedPost.getCollectCount(), false);
     }
 
     /**
@@ -755,16 +753,17 @@ public class PostServiceImpl implements PostService {
     public PageResult<PostListItemResponse> getUserLikedPosts(Long userId, Integer page, Integer size) {
         log.info("获取用户点赞的帖子列表，用户ID: {}, 页码: {}, 每页条数: {}", userId, page, size);
 
-        // 1. 查询用户点赞的帖子ID列表
+        // 1. 分页查询用户点赞记录
         LambdaQueryWrapper<PostLike> likeQueryWrapper = new LambdaQueryWrapper<>();
         likeQueryWrapper.eq(PostLike::getUserId, userId)
                 .orderByDesc(PostLike::getCreateTime);
-        List<PostLike> postLikes = postLikeMapper.selectPage(new Page<>(page, size), likeQueryWrapper).getRecords();
-        
+        Page<PostLike> likePage = postLikeMapper.selectPage(new Page<>(page, size), likeQueryWrapper);
+        List<PostLike> postLikes = likePage.getRecords();
+
         if (postLikes.isEmpty()) {
             return PageResult.of(List.of(), 0L, size.longValue(), page.longValue());
         }
-        
+
         List<Long> postIds = postLikes.stream()
                 .map(PostLike::getPostId)
                 .collect(Collectors.toList());
@@ -774,7 +773,7 @@ public class PostServiceImpl implements PostService {
         postQueryWrapper.in(Post::getId, postIds)
                 .eq(Post::getStatus, 1)
                 .orderByDesc(Post::getCreateTime);
-        
+
         Page<Post> postPage = postMapper.selectPage(new Page<>(1, postIds.size()), postQueryWrapper);
 
         // 3. 收集用户信息
@@ -793,10 +792,10 @@ public class PostServiceImpl implements PostService {
                 .map(post -> convertToPostListItemResponse(post, userMap))
                 .collect(Collectors.toList());
 
-        // 5. 构建分页结果
+        // 5. 构建分页结果（使用真实的总点赞数）
         return PageResult.of(
                 records,
-                (long) postIds.size(),
+                likePage.getTotal(),
                 size.longValue(),
                 page.longValue()
         );
@@ -814,16 +813,17 @@ public class PostServiceImpl implements PostService {
     public PageResult<PostListItemResponse> getUserCollectedPosts(Long userId, Integer page, Integer size) {
         log.info("获取用户收藏的帖子列表，用户ID: {}, 页码: {}, 每页条数: {}", userId, page, size);
 
-        // 1. 查询用户收藏的帖子ID列表
+        // 1. 分页查询用户收藏记录
         LambdaQueryWrapper<PostCollect> collectQueryWrapper = new LambdaQueryWrapper<>();
         collectQueryWrapper.eq(PostCollect::getUserId, userId)
                 .orderByDesc(PostCollect::getCreateTime);
-        List<PostCollect> postCollects = postCollectMapper.selectPage(new Page<>(page, size), collectQueryWrapper).getRecords();
-        
+        Page<PostCollect> collectPage = postCollectMapper.selectPage(new Page<>(page, size), collectQueryWrapper);
+        List<PostCollect> postCollects = collectPage.getRecords();
+
         if (postCollects.isEmpty()) {
             return PageResult.of(List.of(), 0L, size.longValue(), page.longValue());
         }
-        
+
         List<Long> postIds = postCollects.stream()
                 .map(PostCollect::getPostId)
                 .collect(Collectors.toList());
@@ -833,7 +833,7 @@ public class PostServiceImpl implements PostService {
         postQueryWrapper.in(Post::getId, postIds)
                 .eq(Post::getStatus, 1)
                 .orderByDesc(Post::getCreateTime);
-        
+
         Page<Post> postPage = postMapper.selectPage(new Page<>(1, postIds.size()), postQueryWrapper);
 
         // 3. 收集用户信息
@@ -852,10 +852,10 @@ public class PostServiceImpl implements PostService {
                 .map(post -> convertToPostListItemResponse(post, userMap))
                 .collect(Collectors.toList());
 
-        // 5. 构建分页结果
+        // 5. 构建分页结果（使用真实的总收藏数）
         return PageResult.of(
                 records,
-                (long) postIds.size(),
+                collectPage.getTotal(),
                 size.longValue(),
                 page.longValue()
         );

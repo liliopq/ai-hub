@@ -8,6 +8,8 @@ import com.ai_hub.dto.response.PageResult;
 import com.ai_hub.entity.Comment;
 import com.ai_hub.entity.Post;
 import com.ai_hub.entity.User;
+import com.ai_hub.enums.ErrorCode;
+import com.ai_hub.exception.BusinessException;
 import com.ai_hub.mapper.CommentMapper;
 import com.ai_hub.mapper.PostMapper;
 import com.ai_hub.mapper.UserMapper;
@@ -19,7 +21,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -116,17 +120,17 @@ public class AdminServiceImpl implements AdminService {
 
         // 1. 验证状态值
         if (status != 0 && status != 1) {
-            throw new RuntimeException("状态值无效，必须为 0 或 1");
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "状态值无效，必须为 0 或 1");
         }
 
         // 2. 查询用户
         User user = userMapper.selectById(userId);
         if (user == null) {
-            throw new RuntimeException("用户不存在");
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }
 
-        // 3. 如果状态没有变化，直接返回
-        if (user.getStatus().equals(status)) {
+        // 3. 如果状态没有变化，直接返回（使用 Objects.equals 避免 NPE）
+        if (java.util.Objects.equals(user.getStatus(), status)) {
             log.info("用户状态未变化，无需更新");
             return;
         }
@@ -173,9 +177,21 @@ public class AdminServiceImpl implements AdminService {
         Page<Post> page = new Page<>(request.getPage(), request.getSize());
         Page<Post> postPage = postMapper.selectPage(page, queryWrapper);
 
+        // 2.5 批量加载用户信息（避免 N+1 查询）
+        List<Long> userIds = postPage.getRecords().stream()
+                .map(Post::getUserId)
+                .distinct()
+                .collect(Collectors.toList());
+        java.util.Map<Long, User> userMap = new HashMap<>();
+        if (!userIds.isEmpty()) {
+            List<User> users = userMapper.selectBatchIds(userIds);
+            userMap = users.stream().collect(Collectors.toMap(User::getId, u -> u));
+        }
+
         // 3. 转换为响应 DTO
+        java.util.Map<Long, User> finalUserMap = userMap;
         List<AdminPostResponse> records = postPage.getRecords().stream()
-                .map(this::convertToAdminPostResponse)
+                .map(post -> convertToAdminPostResponse(post, finalUserMap))
                 .collect(Collectors.toList());
 
         // 4. 构建分页结果
@@ -191,9 +207,10 @@ public class AdminServiceImpl implements AdminService {
      * 将 Post 实体转换为 AdminPostResponse
      *
      * @param post 帖子实体
+     * @param userMap 预加载的用户ID到用户对象的映射
      * @return 管理员帖子响应 DTO
      */
-    private AdminPostResponse convertToAdminPostResponse(Post post) {
+    private AdminPostResponse convertToAdminPostResponse(Post post, java.util.Map<Long, User> userMap) {
         // 生成内容摘要（前100个字符）
         String contentSummary = null;
         if (post.getContent() != null) {
@@ -202,10 +219,10 @@ public class AdminServiceImpl implements AdminService {
                     : post.getContent();
         }
 
-        // 查询作者信息
+        // 从预加载的用户映射中获取作者信息（避免 N+1 查询）
         AdminPostResponse.UserBasicInfo userInfo = null;
         if (post.getUserId() != null) {
-            User postUser = userMapper.selectById(post.getUserId());
+            User postUser = userMap.get(post.getUserId());
             if (postUser != null) {
                 userInfo = AdminPostResponse.UserBasicInfo.builder()
                         .id(postUser.getId())
@@ -248,17 +265,17 @@ public class AdminServiceImpl implements AdminService {
 
         // 1. 验证状态值
         if (status != 0 && status != 1 && status != 2) {
-            throw new RuntimeException("状态值无效，必须为 0、1 或 2");
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "状态值无效，必须为 0、1 或 2");
         }
 
         // 2. 查询帖子
         Post post = postMapper.selectById(postId);
         if (post == null) {
-            throw new RuntimeException("帖子不存在");
+            throw new BusinessException(ErrorCode.POST_NOT_FOUND);
         }
 
-        // 3. 如果状态没有变化，直接返回
-        if (post.getStatus().equals(status)) {
+        // 3. 如果状态没有变化，直接返回（使用 Objects.equals 避免 NPE）
+        if (java.util.Objects.equals(post.getStatus(), status)) {
             log.info("帖子状态未变化，无需更新");
             return;
         }
@@ -302,14 +319,14 @@ public class AdminServiceImpl implements AdminService {
         // 1. 查询帖子
         Post post = postMapper.selectById(postId);
         if (post == null) {
-            throw new RuntimeException("帖子不存在");
+            throw new BusinessException(ErrorCode.POST_NOT_FOUND);
         }
 
         // 2. 转换为数据库存储的值 (true -> 1, false -> 0)
         Integer stickyValue = sticky ? 1 : 0;
 
-        // 3. 如果状态没有变化，直接返回
-        if (post.getIsSticky().equals(stickyValue)) {
+        // 3. 如果状态没有变化，直接返回（使用 Objects.equals 避免 NPE）
+        if (java.util.Objects.equals(post.getIsSticky(), stickyValue)) {
             log.info("帖子置顶状态未变化，无需更新");
             return;
         }
@@ -334,7 +351,7 @@ public class AdminServiceImpl implements AdminService {
         // 1. 查询评论
         Comment comment = commentMapper.selectById(commentId);
         if (comment == null) {
-            throw new RuntimeException("评论不存在");
+            throw new BusinessException(ErrorCode.COMMENT_NOT_FOUND);
         }
 
         // 2. 执行逻辑删除（MyBatis-Plus 的 @TableLogic 会自动处理）
